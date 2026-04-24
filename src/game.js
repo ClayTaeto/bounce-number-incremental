@@ -12,6 +12,7 @@ class Game {
     this._mergeHoldStart = 0;
     this._mergeHoldLast = 0;
     this._lastAutoAdd = 0;
+    this._lastWallSound = 0;
     this._lastSave = Date.now();
     this._lastIncomeWindow = [];
     this._currentTab = 'All';
@@ -154,6 +155,7 @@ class Game {
 
   _mergeBalls(a, b) {
     const newTier = a.tier + 1;
+    if (window.audio) window.audio.playMerge(newTier);
     const nx = (a.x + b.x) / 2;
     const ny = (a.y + b.y) / 2;
     const angle = Math.random() * Math.PI * 2;
@@ -182,6 +184,7 @@ class Game {
   }
 
   _triggerLightspeed(ball) {
+    if (window.audio) window.audio.playLightspeed();
     ball._remove = true;
     const frags = Math.ceil(Math.max(1, ball.tier / 2) * (1 + (this.state.permanentUpgrades.fragBoost || 0) * 0.25));
     this.state.lightFragments = this.state.lightFragments.add(frags);
@@ -273,6 +276,12 @@ class Game {
     this.state.wallHits++;
     this._lastIncomeWindow.push({ t: now, v: payout });
 
+    if (window.audio && now - this._lastWallSound > 50) {
+      this._lastWallSound = now;
+      if (isCrit) window.audio.playCrit();
+      else window.audio.playWallHit(ball.tier);
+    }
+
     // Popup (limit density)
     if (this.state._popups.length < 25) {
       this.state._popups.push({
@@ -339,6 +348,7 @@ class Game {
   }
 
   prestige() {
+    if (window.audio) window.audio.playPrestige();
     const raw = this.state.lifetimeMoney.div(1e9);
     const shards = raw.pow(0.5).add(this.state.highestTier).floor().add(1);
     this.state.primeShards = this.state.primeShards.add(shards);
@@ -414,7 +424,16 @@ class Game {
   _renderUpgradeCards() { renderUpgradeCards(this); }
 
   _bindInput() {
+    const unlockAudio = () => {
+      if (window.audio) window.audio.unlock();
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+
     const startAdd = () => {
+      if (window.audio) window.audio.playClick();
       this._addHeld = true;
       this._addHoldStart = this._addHoldLast = performance.now();
       this.tryAdd();
@@ -473,6 +492,20 @@ class Game {
 
     document.getElementById('btn-clear-save').addEventListener('click', () => {
       if (confirm('Delete all save data and restart?')) { clearSave(); location.reload(); }
+    });
+
+    document.getElementById('btn-mute').addEventListener('click', e => {
+      if (!window.audio) return;
+      const muted = !window.audio._muted;
+      window.audio.setMuted(muted);
+      e.currentTarget.textContent = muted ? '🔇' : '🔊';
+      window.audio.playClick();
+    });
+    document.getElementById('vol-music').addEventListener('input', e => {
+      if (window.audio) window.audio.setMusicVolume(e.target.value / 100);
+    });
+    document.getElementById('vol-sfx').addEventListener('input', e => {
+      if (window.audio) window.audio.setSfxVolume(e.target.value / 100);
     });
   }
 

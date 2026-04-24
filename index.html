@@ -256,6 +256,9 @@
     <div class="top-stat">Best: <span id="highest-display">1</span></div>
     <div class="top-stat">⚡ Frags: <span id="frags-display">0</span></div>
     <div class="top-stat">Prestige: <span id="prestige-display">0</span></div>
+    <button id="btn-mute" title="Mute/Unmute" style="background:none;border:1px solid #333;color:#ccc;font-size:16px;padding:2px 8px;border-radius:4px;cursor:pointer;font-family:inherit;">🔊</button>
+    <input type="range" id="vol-music" min="0" max="100" value="15" title="Music Volume" style="width:60px">
+    <input type="range" id="vol-sfx" min="0" max="100" value="40" title="SFX Volume" style="width:60px">
   </div>
 
   <div id="main-area">
@@ -313,6 +316,7 @@
   <script src="src/save.js"></script>
   <script src="src/render.js"></script>
   <script src="src/ui.js"></script>
+  <script src="src/audio.js"></script>
   <script src="src/game.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
