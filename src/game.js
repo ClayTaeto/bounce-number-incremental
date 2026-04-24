@@ -16,6 +16,12 @@ class Game {
     this._lastIncomeWindow = [];
     this._currentTab = 'All';
 
+    this._challengeSystem = new ChallengeSystem();
+    this._challengesMergedThisRun = false;
+    this._slowBallTimer = 0;
+    this._fullHouseTimer = 0;
+    this._challengeStartTime = Date.now();
+
     this._resizeCanvas();
     window.addEventListener('resize', () => this._resizeCanvas());
 
@@ -153,6 +159,7 @@ class Game {
   }
 
   _mergeBalls(a, b) {
+    this._challengesMergedThisRun = true;
     const newTier = a.tier + 1;
     const nx = (a.x + b.x) / 2;
     const ny = (a.y + b.y) / 2;
@@ -351,6 +358,10 @@ class Game {
     this.state.permanentUpgrades = keepPerm;
     this.state.prestige = keepPrestige;
     this.state.primeShards = keepShards;
+    this._challengesMergedThisRun = false;
+    this._slowBallTimer = 0;
+    this._fullHouseTimer = 0;
+    this._challengeStartTime = Date.now();
     this._spawnBall(0);
     this._renderUpgradeCards();
     saveGame(this.state, this.canvas.width, this.canvas.height);
@@ -408,6 +419,21 @@ class Game {
     const c = {};
     for (const b of this.state.balls) c[b.tier] = (c[b.tier] || 0) + 1;
     return Object.values(c).reduce((s, n) => s + Math.floor(n / 2), 0);
+  }
+
+  _updateChallenges(dt) {
+    const threshold = this.getLightspeedThreshold();
+    const halfThreshold = threshold * 0.5;
+    const allSlow = this.state.balls.length > 0 && this.state.balls.every(b =>
+      b.vx * b.vx + b.vy * b.vy < halfThreshold * halfThreshold
+    );
+    if (allSlow) this._slowBallTimer += dt;
+    else this._slowBallTimer = 0;
+
+    if (this.state.balls.length >= this.getCapacity()) this._fullHouseTimer += dt;
+    else this._fullHouseTimer = 0;
+
+    this._challengeSystem.check(this.state, this);
   }
 
   _buildUpgradeTabs() { buildUpgradeTabs(this); }
@@ -482,6 +508,7 @@ class Game {
     const now = performance.now();
 
     this._updatePhysics(dt);
+    this._updateChallenges(dt);
     this._updateInput(now);
     this._updateParticles(dt);
     this._updatePopups(dt);

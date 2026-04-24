@@ -1,5 +1,5 @@
 function buildUpgradeTabs(game) {
-  const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab))];
+  const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab)), 'Challenges'];
   const el = document.getElementById('upgrade-tabs');
   el.innerHTML = '';
   tabs.forEach(tab => {
@@ -16,8 +16,64 @@ function buildUpgradeTabs(game) {
   });
 }
 
+function _renderChallengeCards(game, content) {
+  const system = game._challengeSystem;
+  const difficultyColor = { Easy: '#44bb44', Medium: '#ffaa33', Hard: '#ff4444' };
+
+  CHALLENGES.forEach(ch => {
+    const completed = system.isCompleted(ch.id);
+    const card = document.createElement('div');
+    card.className = 'upgrade-card' + (completed ? ' maxed' : '');
+    card.style.cursor = 'default';
+
+    const dColor = difficultyColor[ch.difficulty] || '#888';
+    const dBadge = `<span style="font-size:9px;color:${dColor};border:1px solid ${dColor};border-radius:3px;padding:0 4px;margin-left:4px;">${ch.difficulty}</span>`;
+
+    let progressHtml = '';
+    const state = game.state;
+    if (!completed) {
+      if (ch.id === 'wall_hitter') {
+        const pct = Math.min(100, Math.round((state.wallHits / 10000) * 100));
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Wall Hits: ${state.wallHits.toLocaleString()} / 10,000 (${pct}%)</div>`;
+      } else if (ch.id === 'prestige_5') {
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Prestige: ${state.prestige} / 5</div>`;
+      } else if (ch.id === 'light_collector') {
+        const cur = state.lightFragments.toFixed(0);
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Fragments: ${cur} / 50</div>`;
+      } else if (ch.id === 'tier_rush') {
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Highest Tier: ${state.highestTier} / 19</div>`;
+      } else if (ch.id === 'slow_ball') {
+        const t = game._slowBallTimer ? game._slowBallTimer.toFixed(1) : '0.0';
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Timer: ${t}s / 30s</div>`;
+      } else if (ch.id === 'max_capacity') {
+        const t = game._fullHouseTimer ? game._fullHouseTimer.toFixed(1) : '0.0';
+        progressHtml = `<div class="upg-desc" style="color:#5577aa;">Timer: ${t}s / 60s</div>`;
+      }
+    }
+
+    card.innerHTML = `
+      <div class="upg-header">
+        <span class="upg-name">${completed ? '✓ ' : ''}${ch.name}</span>
+        ${dBadge}
+      </div>
+      <div class="upg-desc">${ch.description}</div>
+      ${progressHtml}
+      <div class="upg-effect" style="color:#42a5f5;">${ch.reward.description}</div>
+      <div class="upg-cost" style="color:${completed ? '#44bb44' : '#888'};">${completed ? '✓ Completed' : 'Incomplete'}</div>
+    `;
+    content.appendChild(card);
+  });
+}
+
 function renderUpgradeCards(game) {
   const content = document.getElementById('upgrade-content');
+
+  if (game._currentTab === 'Challenges') {
+    content.innerHTML = '';
+    _renderChallengeCards(game, content);
+    return;
+  }
+
   const filter = game._currentTab === 'All' ? null : game._currentTab;
   const visible = getVisibleUpgrades(game.state, filter);
 
