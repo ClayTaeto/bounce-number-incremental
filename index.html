@@ -246,6 +246,16 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #0a0a10; }
     ::-webkit-scrollbar-thumb { background: #252535; border-radius: 3px; }
+
+    .tutorial-highlight {
+      outline: 3px solid #4fc3f7 !important;
+      outline-offset: 3px;
+      animation: tutorial-pulse 1s ease-in-out infinite;
+    }
+    @keyframes tutorial-pulse {
+      0%, 100% { outline-color: #4fc3f7; }
+      50% { outline-color: #81d4fa; box-shadow: 0 0 12px #4fc3f7; }
+    }
   </style>
 </head>
 <body>
@@ -325,11 +335,27 @@
   <script src="src/save.js"></script>
   <script src="src/render.js"></script>
   <script src="src/ui.js"></script>
+  <script src="src/tutorial.js"></script>
   <script src="src/game.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       window.game = new Game();
     });
   </script>
+
+  <!-- Tutorial tooltip -->
+  <div id="tutorial-tooltip" style="display:none; position:fixed; z-index:1000; background:#1a1a2e; border:2px solid #4fc3f7; border-radius:8px; padding:12px 16px; max-width:280px; box-shadow:0 4px 20px rgba(79,195,247,0.3); pointer-events:auto;">
+    <div id="tutorial-title" style="font-size:12px; color:#4fc3f7; font-weight:bold; margin-bottom:6px;"></div>
+    <div id="tutorial-text" style="font-size:13px; color:#e0e0e0; line-height:1.4;"></div>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button id="tutorial-skip" style="background:#333; color:#aaa; border:1px solid #555; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px;">Skip Tutorial</button>
+      <button id="tutorial-next" style="background:#4fc3f7; color:#000; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; display:none;">Next →</button>
+    </div>
+  </div>
+
+  <!-- Tutorial complete notification -->
+  <div id="tutorial-complete-notif" style="display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1001; background:#1b5e20; border:2px solid #4caf50; border-radius:8px; padding:12px 24px; color:#a5d6a7; font-size:14px; font-weight:bold; box-shadow:0 4px 20px rgba(76,175,80,0.4);">
+    ✓ Tutorial Complete! You're ready to play!
+  </div>
 </body>
 </html>

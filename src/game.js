@@ -34,6 +34,9 @@ class Game {
     this._bindInput();
     this._lastTime = performance.now();
     requestAnimationFrame(ts => this._loop(ts));
+
+    this._tutorial = new Tutorial(this);
+    this._tutorial.start();
   }
 
   _freshState() {
@@ -498,6 +501,11 @@ class Game {
     document.getElementById('btn-clear-save').addEventListener('click', () => {
       if (confirm('Delete all save data and restart?')) { clearSave(); location.reload(); }
     });
+
+    const skipBtn = document.getElementById('tutorial-skip');
+    if (skipBtn) skipBtn.addEventListener('click', () => this._tutorial && this._tutorial.skip());
+    const nextBtn = document.getElementById('tutorial-next');
+    if (nextBtn) nextBtn.addEventListener('click', () => this._tutorial && this._tutorial._advance());
   }
 
   _loop(timestamp) {
@@ -512,6 +520,7 @@ class Game {
     this._updateIncomePerSec();
     renderArena(this.ctx, this.state, this);
     this._updateUI();
+    if (this._tutorial) this._tutorial.check(this.state);
 
     if (Date.now() - this._lastSave > 30000) {
       saveGame(this.state, this.canvas.width, this.canvas.height);
