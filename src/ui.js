@@ -188,21 +188,27 @@ function renderUpgradeCards(game) {
   const filter = game._currentTab === 'All' ? null : game._currentTab;
   const visible = getVisibleUpgrades(game.state, filter);
 
-  // Track previously unlocked count so we can flash new ones
-  const prevCount = game._prevUnlockedCount || 0;
-  if (visible.length > prevCount) game._prevUnlockedCount = visible.length;
-
-  content.innerHTML = '';
-
   if (visible.length === 0) {
-    const msg = document.createElement('div');
-    msg.style.cssText = 'padding:16px;color:#444;font-size:12px;text-align:center;';
-    msg.textContent = filter
-      ? `No ${filter} upgrades available yet.`
-      : 'Keep playing to unlock upgrades!';
-    content.appendChild(msg);
+    if (content.children.length !== 1 || !content.children[0].dataset.empty) {
+      content.innerHTML = '';
+      const msg = document.createElement('div');
+      msg.dataset.empty = '1';
+      msg.style.cssText = 'padding:16px;color:#444;font-size:12px;text-align:center;';
+      msg.textContent = filter
+        ? `No ${filter} upgrades available yet.`
+        : 'Keep playing to unlock upgrades!';
+      content.appendChild(msg);
+    }
     return;
   }
+
+  // Build an id→card map of what's currently rendered
+  const existing = {};
+  for (const el of content.querySelectorAll('.upgrade-card[data-upg-id]')) {
+    existing[el.dataset.upgId] = el;
+  }
+
+  const fragment = document.createDocumentFragment();
 
   visible.forEach(upg => {
     const level = getUpgradeLevel(upg, game.state);
@@ -213,58 +219,77 @@ function renderUpgradeCards(game) {
     const isShard = upg.currency === 'primeShards';
     const isInf = upg.infinityPersistent;
 
-    const card = document.createElement('div');
-    card.className = 'upgrade-card'
+    const newClass = 'upgrade-card'
       + (affordable ? ' affordable' : '')
       + (maxed ? ' maxed' : '')
       + (isLF ? ' lf-card' : '')
       + (isShard ? ' shard-card' : '')
       + (isInf ? ' inf-card' : '');
 
+    const costText = maxed ? '✓ MAX' : (isLF ? '⚡' : isShard ? '◆' : isInf ? '∞' : '$') + formatMoney(cost);
+    const effectText = upg.effect(level);
     const tabBadge = game._currentTab === 'All'
       ? `<span class="upg-tab-badge">${upg.tab}</span>`
       : '';
+    const levelText = `Lv ${level}/${upg.maxLevel}`;
 
-    card.innerHTML = `
-      <div class="upg-header">
-        <span class="upg-name">${upg.name}</span>
-        ${tabBadge}
-        <span class="upg-level">Lv ${level}/${upg.maxLevel}</span>
-      </div>
-      <div class="upg-desc">${upg.desc}</div>
-      <div class="upg-effect">${upg.effect(level)}</div>
-      <div class="upg-cost">${maxed ? '✓ MAX' : (isLF ? '⚡' : isShard ? '◆' : isInf ? '∞' : '$') + formatMoney(cost)}</div>
-    `;
-    if (!maxed) {
-      let holdTimer = null;
-      let holdInterval = null;
+    let card = existing[upg.id];
 
-      function tryBuy() {
-        if (purchaseUpgrade(upg, game.state)) game.onUpgradePurchased(upg);
+    if (!card) {
+      // First time seeing this upgrade — create the card
+      card = document.createElement('div');
+      card.dataset.upgId = upg.id;
+      card.innerHTML = `
+        <div class="upg-header">
+          <span class="upg-name">${upg.name}</span>
+          ${tabBadge}
+          <span class="upg-level">${levelText}</span>
+        </div>
+        <div class="upg-desc">${upg.desc}</div>
+        <div class="upg-effect">${effectText}</div>
+        <div class="upg-cost">${costText}</div>
+      `;
+
+      if (!maxed) {
+        let holdTimer = null;
+        let holdInterval = null;
+
+        function tryBuy() {
+          if (purchaseUpgrade(upg, game.state)) game.onUpgradePurchased(upg);
+        }
+
+        card.addEventListener('mousedown', e => {
+          if (e.button !== 0) return;
+          tryBuy();
+          holdTimer = setTimeout(() => { holdInterval = setInterval(tryBuy, 80); }, 400);
+        });
+        card.addEventListener('mouseup',    () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        card.addEventListener('mouseleave', () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        card.addEventListener('touchstart', e => {
+          e.preventDefault();
+          tryBuy();
+          holdTimer = setTimeout(() => { holdInterval = setInterval(tryBuy, 80); }, 400);
+        }, { passive: false });
+        card.addEventListener('touchend',   () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        card.addEventListener('touchcancel',() => { clearTimeout(holdTimer); clearInterval(holdInterval); });
       }
-
-      card.addEventListener('mousedown', e => {
-        if (e.button !== 0) return;
-        tryBuy();
-        holdTimer = setTimeout(() => {
-          holdInterval = setInterval(tryBuy, 80);
-        }, 400);
-      });
-
-      card.addEventListener('mouseup',    () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-      card.addEventListener('mouseleave', () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-
-      card.addEventListener('touchstart', e => {
-        e.preventDefault();
-        tryBuy();
-        holdTimer = setTimeout(() => {
-          holdInterval = setInterval(tryBuy, 80);
-        }, 400);
-      }, { passive: false });
-
-      card.addEventListener('touchend',   () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-      card.addEventListener('touchcancel',() => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+    } else {
+      // Card exists — only patch the parts that change
+      card.querySelector('.upg-level').textContent = levelText;
+      card.querySelector('.upg-effect').textContent = effectText;
+      card.querySelector('.upg-cost').textContent = costText;
     }
-    content.appendChild(card);
+
+    // Always sync className (affordable/maxed can change every tick)
+    card.className = newClass;
+    fragment.appendChild(card);
   });
+
+  // Replace content only if the set of visible upgrades changed, otherwise just reorder in-place
+  const renderedIds = [...content.querySelectorAll('.upgrade-card[data-upg-id]')].map(el => el.dataset.upgId).join(',');
+  const visibleIds = visible.map(u => u.id).join(',');
+  if (renderedIds !== visibleIds) {
+    content.innerHTML = '';
+    content.appendChild(fragment);
+  }
 }
