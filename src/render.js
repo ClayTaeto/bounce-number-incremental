@@ -1,12 +1,23 @@
 function renderArena(ctx, state, game) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
+  const layoutId = state.arenaLayout || 'classic';
 
-  ctx.fillStyle = '#0a0a10';
+  // Background tint per layout
+  if (layoutId === 'pinball') {
+    ctx.fillStyle = '#080a12';
+  } else if (layoutId === 'hallway') {
+    ctx.fillStyle = '#0a0d0a';
+  } else {
+    ctx.fillStyle = '#0a0a10';
+  }
   ctx.fillRect(0, 0, w, h);
 
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(35, 35, 65, 0.5)';
+  // Subtle grid — color varies by layout
+  let gridColor = 'rgba(35, 35, 65, 0.5)';
+  if (layoutId === 'pinball') gridColor = 'rgba(30, 35, 70, 0.5)';
+  if (layoutId === 'hallway') gridColor = 'rgba(30, 55, 35, 0.5)';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let x = 60; x < w; x += 60) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
@@ -20,53 +31,113 @@ function renderArena(ctx, state, game) {
   const threshold = game.getLightspeedThreshold();
   for (const ball of state.balls) renderBall(ctx, ball, threshold);
   if (state._popups) renderPopups(ctx, state._popups);
+
+  // Layout name label (top-left, faded)
+  if (ARENA_LAYOUTS && ARENA_LAYOUTS[layoutId]) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(ARENA_LAYOUTS[layoutId].name, 6, 6);
+    ctx.restore();
+  }
 }
 
 function renderWalls(ctx, state, game, w, h) {
   const lm = game.getWallMult('left');
   const rm = game.getWallMult('right');
+  const tm = game.getWallMult('top');
+  const bm = game.getWallMult('bottom');
 
   // Left wall glow
-  const lAlpha = Math.min(0.9, 0.2 + lm * 0.12);
-  const lg = ctx.createLinearGradient(0, 0, 16, 0);
-  lg.addColorStop(0, `rgba(80, 160, 255, ${lAlpha})`);
-  lg.addColorStop(1, 'rgba(80, 160, 255, 0)');
-  ctx.fillStyle = lg;
-  ctx.fillRect(0, 0, 16, h);
+  if (lm > 0) {
+    const lAlpha = Math.min(0.9, 0.2 + lm * 0.12);
+    const lg = ctx.createLinearGradient(0, 0, 16, 0);
+    lg.addColorStop(0, `rgba(80, 160, 255, ${lAlpha})`);
+    lg.addColorStop(1, 'rgba(80, 160, 255, 0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(0, 0, 16, h);
+    ctx.fillStyle = `rgba(80, 160, 255, ${Math.min(1, lAlpha + 0.3)})`;
+    ctx.fillRect(0, 0, 3, h);
+    // Label
+    ctx.save();
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.translate(10, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(`x${lm.toFixed(1)}`, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(60, 30, 30, 0.6)';
+    ctx.fillRect(0, 0, 3, h);
+  }
 
   // Right wall glow
-  const rAlpha = Math.min(0.9, 0.2 + rm * 0.12);
-  const rg = ctx.createLinearGradient(w, 0, w - 16, 0);
-  rg.addColorStop(0, `rgba(80, 160, 255, ${rAlpha})`);
-  rg.addColorStop(1, 'rgba(80, 160, 255, 0)');
-  ctx.fillStyle = rg;
-  ctx.fillRect(w - 16, 0, 16, h);
+  if (rm > 0) {
+    const rAlpha = Math.min(0.9, 0.2 + rm * 0.12);
+    const rg = ctx.createLinearGradient(w, 0, w - 16, 0);
+    rg.addColorStop(0, `rgba(80, 160, 255, ${rAlpha})`);
+    rg.addColorStop(1, 'rgba(80, 160, 255, 0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(w - 16, 0, 16, h);
+    ctx.fillStyle = `rgba(80, 160, 255, ${Math.min(1, rAlpha + 0.3)})`;
+    ctx.fillRect(w - 3, 0, 3, h);
+    // Label
+    ctx.save();
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.translate(w - 10, h / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillText(`x${rm.toFixed(1)}`, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(60, 30, 30, 0.6)';
+    ctx.fillRect(w - 3, 0, 3, h);
+  }
 
-  // Solid wall lines
-  ctx.fillStyle = `rgba(80, 160, 255, ${Math.min(1, lAlpha + 0.3)})`;
-  ctx.fillRect(0, 0, 3, h);
-  ctx.fillStyle = `rgba(80, 160, 255, ${Math.min(1, rAlpha + 0.3)})`;
-  ctx.fillRect(w - 3, 0, 3, h);
+  // Top wall
+  if (tm > 0) {
+    const tAlpha = Math.min(0.9, 0.15 + tm * 0.1);
+    const tg = ctx.createLinearGradient(0, 0, 0, 14);
+    tg.addColorStop(0, `rgba(80, 200, 150, ${tAlpha})`);
+    tg.addColorStop(1, 'rgba(80, 200, 150, 0)');
+    ctx.fillStyle = tg;
+    ctx.fillRect(0, 0, w, 14);
+    ctx.fillStyle = `rgba(80, 200, 150, ${Math.min(1, tAlpha + 0.3)})`;
+    ctx.fillRect(0, 0, w, 2);
+    // Label
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(100, 220, 170, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`x${tm.toFixed(1)}`, w / 2, 14);
+  } else {
+    ctx.fillStyle = 'rgba(60, 60, 100, 0.5)';
+    ctx.fillRect(0, 0, w, 2);
+  }
 
-  // Neutral top/bottom
-  ctx.fillStyle = 'rgba(60, 60, 100, 0.5)';
-  ctx.fillRect(0, 0, w, 2);
-  ctx.fillRect(0, h - 2, w, 2);
-
-  // Multiplier labels on walls
-  ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
-  ctx.textAlign = 'center';
-  ctx.save();
-  ctx.translate(10, h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`x${lm.toFixed(1)}`, 0, 0);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(w - 10, h / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.fillText(`x${rm.toFixed(1)}`, 0, 0);
-  ctx.restore();
+  // Bottom wall
+  if (bm > 0) {
+    const bAlpha = Math.min(0.9, 0.15 + bm * 0.1);
+    const bg = ctx.createLinearGradient(0, h, 0, h - 14);
+    bg.addColorStop(0, `rgba(80, 200, 150, ${bAlpha})`);
+    bg.addColorStop(1, 'rgba(80, 200, 150, 0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, h - 14, w, 14);
+    ctx.fillStyle = `rgba(80, 200, 150, ${Math.min(1, bAlpha + 0.3)})`;
+    ctx.fillRect(0, h - 2, w, 2);
+    // Label
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(100, 220, 170, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`x${bm.toFixed(1)}`, w / 2, h - 4);
+  } else {
+    ctx.fillStyle = 'rgba(60, 60, 100, 0.5)';
+    ctx.fillRect(0, h - 2, w, 2);
+  }
 }
 
 function renderBall(ctx, ball, threshold) {

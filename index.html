@@ -246,6 +246,31 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #0a0a10; }
     ::-webkit-scrollbar-thumb { background: #252535; border-radius: 3px; }
+
+    /* ── LAYOUT SWITCHER ── */
+    #layout-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px 6px;
+      background: #0e0e18;
+      border-bottom: 1px solid #222235;
+      flex-shrink: 0;
+    }
+    .layout-btn {
+      padding: 3px 10px;
+      background: #14142a;
+      border: 1px solid #2a2a45;
+      border-radius: 4px;
+      color: #666;
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .layout-btn:hover:not(:disabled) { background: #1e1e38; color: #aaa; border-color: #3a3a60; }
+    .layout-btn.active { background: #1e2040; color: #88aaff; border-color: #3355aa; }
+    .layout-btn.locked, .layout-btn:disabled { opacity: 0.35; cursor: default; }
   </style>
 </head>
 <body>
@@ -278,14 +303,21 @@
       </div>
     </div>
 
-    <!-- CENTER: arena canvas -->
-    <div id="arena-container">
-      <canvas id="arena"></canvas>
-      <div id="prestige-notification">
-        <div class="pn-title">✦ Arena Full!</div>
-        <div class="pn-sub">Prestige is now available</div>
+    <!-- CENTER: layout switcher + arena canvas -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+      <div id="layout-switcher">
+        <button class="layout-btn active" data-layout="classic">Classic Box</button>
+        <button class="layout-btn locked" data-layout="pinball" disabled>Pinball Table</button>
+        <button class="layout-btn locked" data-layout="hallway" disabled>Long Hallway</button>
       </div>
-      <button id="btn-clear-save">reset save</button>
+      <div id="arena-container">
+        <canvas id="arena"></canvas>
+        <div id="prestige-notification">
+          <div class="pn-title">✦ Arena Full!</div>
+          <div class="pn-sub">Prestige is now available</div>
+        </div>
+        <button id="btn-clear-save">reset save</button>
+      </div>
     </div>
 
     <!-- RIGHT: upgrades -->
