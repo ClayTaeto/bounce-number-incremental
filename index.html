@@ -228,6 +228,30 @@
     }
     #btn-prestige:hover { background: #281555; border-color: #aa66ff; }
 
+    #btn-break-infinity {
+      display: none;
+      width: 160px;
+      height: 68px;
+      background: #1a0a2e;
+      border: 2px solid #7722bb;
+      border-radius: 8px;
+      color: #cc88ff;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.1s, box-shadow 0.1s;
+      box-shadow: 0 0 8px rgba(150, 50, 255, 0.3);
+    }
+    #btn-break-infinity:hover { background: #230e3a; border-color: #aa44ee; box-shadow: 0 0 16px rgba(150, 50, 255, 0.6); }
+
+    .upgrade-card.shard-card            { border-color: #3a2a5a; }
+    .upgrade-card.shard-card.affordable { border-color: #6a4aaa; }
+    .upgrade-card.shard-card .upg-cost  { color: #cc88ff; }
+    .upgrade-card.inf-card              { border-color: #2a1a4a; }
+    .upgrade-card.inf-card.affordable   { border-color: #7733cc; }
+    .upgrade-card.inf-card .upg-cost    { color: #bb77ff; }
+
     #btn-clear-save {
       position: absolute;
       bottom: 8px;
@@ -493,9 +517,10 @@
       Merge
       <span class="btn-sub" id="merge-pairs-display">0 pairs</span>
     </button>
-    <div style="display:flex;flex-direction:column;align-items:center">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
       <div id="prestige-hint">✨ PRESTIGE ✨</div>
       <button id="btn-prestige">✦ Prestige</button>
+      <button id="btn-break-infinity" style="display:none">∞ Break Infinity</button>
     </div>
   </div>
 

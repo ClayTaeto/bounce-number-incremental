@@ -31,7 +31,20 @@ function drawSparkline(canvas, history) {
 }
 
 function buildUpgradeTabs(game) {
-  const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab)), 'Achievements', 'Challenges'];
+  const state = game.state;
+  const showPrestige = state.prestige >= 1;
+  const showInfinity = state.infinityPrestige >= 1 || state.prestige >= 10;
+  const allTabs = [...new Set(UPGRADES.map(u => u.tab))];
+  const visibleTabs = allTabs.filter(tab => {
+    if (tab === 'Prestige') return showPrestige;
+    if (tab === 'Infinity') return showInfinity;
+    return true;
+  });
+  const tabs = ['All', ...visibleTabs, 'Achievements', 'Challenges'];
+
+  if (!tabs.includes(game._currentTab)) game._currentTab = 'All';
+
+
   const el = document.getElementById('upgrade-tabs');
   el.innerHTML = '';
   tabs.forEach(tab => {
@@ -179,12 +192,16 @@ function renderUpgradeCards(game) {
     const maxed = level >= upg.maxLevel;
     const cost = getUpgradeCost(upg, level);
     const isLF = upg.currency === 'lightFragments';
+    const isShard = upg.currency === 'primeShards';
+    const isInf = upg.infinityPersistent;
 
     const card = document.createElement('div');
     card.className = 'upgrade-card'
       + (affordable ? ' affordable' : '')
       + (maxed ? ' maxed' : '')
-      + (isLF ? ' lf-card' : '');
+      + (isLF ? ' lf-card' : '')
+      + (isShard ? ' shard-card' : '')
+      + (isInf ? ' inf-card' : '');
 
     const tabBadge = game._currentTab === 'All'
       ? `<span class="upg-tab-badge">${upg.tab}</span>`
@@ -198,7 +215,7 @@ function renderUpgradeCards(game) {
       </div>
       <div class="upg-desc">${upg.desc}</div>
       <div class="upg-effect">${upg.effect(level)}</div>
-      <div class="upg-cost">${maxed ? '✓ MAX' : (isLF ? '⚡' : '$') + formatMoney(cost)}</div>
+      <div class="upg-cost">${maxed ? '✓ MAX' : (isLF ? '⚡' : isShard ? '◆' : isInf ? '∞' : '$') + formatMoney(cost)}</div>
     `;
     if (!maxed) {
       card.addEventListener('click', () => {

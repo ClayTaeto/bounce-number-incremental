@@ -15,10 +15,13 @@ function saveGame(state, arenaW, arenaH) {
       lightFragments: state.lightFragments.toString(),
       primeShards: state.primeShards.toString(),
       lifetimeMoney: state.lifetimeMoney.toString(),
+      infinityPoints: state.infinityPoints.toString(),
       numbersAdded: state.numbersAdded,
       prestige: state.prestige,
+      infinityPrestige: state.infinityPrestige,
       upgrades: { ...state.upgrades },
       permanentUpgrades: { ...state.permanentUpgrades },
+      infinityUpgrades: { ...state.infinityUpgrades },
       highestTier: state.highestTier,
       wallHits: state.wallHits,
       prestigeAvailable: state.prestigeAvailable,
@@ -58,10 +61,13 @@ function loadSave(state, arenaW, arenaH) {
     state.lightFragments = new Decimal(data.lightFragments || 0);
     state.primeShards = new Decimal(data.primeShards || 0);
     state.lifetimeMoney = new Decimal(data.lifetimeMoney || 0);
+    state.infinityPoints = new Decimal(data.infinityPoints || 0);
     state.numbersAdded = data.numbersAdded || 0;
     state.prestige = data.prestige || 0;
+    state.infinityPrestige = data.infinityPrestige || 0;
     state.upgrades = data.upgrades || {};
     state.permanentUpgrades = data.permanentUpgrades || {};
+    state.infinityUpgrades = data.infinityUpgrades || {};
     state.highestTier = data.highestTier || 0;
     state.wallHits = data.wallHits || 0;
     state.prestigeAvailable = data.prestigeAvailable || false;
