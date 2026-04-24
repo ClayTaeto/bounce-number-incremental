@@ -236,9 +236,34 @@ function renderUpgradeCards(game) {
       <div class="upg-cost">${maxed ? '✓ MAX' : (isLF ? '⚡' : isShard ? '◆' : isInf ? '∞' : '$') + formatMoney(cost)}</div>
     `;
     if (!maxed) {
-      card.addEventListener('click', () => {
+      let holdTimer = null;
+      let holdInterval = null;
+
+      function tryBuy() {
         if (purchaseUpgrade(upg, game.state)) game.onUpgradePurchased(upg);
+      }
+
+      card.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        tryBuy();
+        holdTimer = setTimeout(() => {
+          holdInterval = setInterval(tryBuy, 80);
+        }, 400);
       });
+
+      card.addEventListener('mouseup',    () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+      card.addEventListener('mouseleave', () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+
+      card.addEventListener('touchstart', e => {
+        e.preventDefault();
+        tryBuy();
+        holdTimer = setTimeout(() => {
+          holdInterval = setInterval(tryBuy, 80);
+        }, 400);
+      }, { passive: false });
+
+      card.addEventListener('touchend',   () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+      card.addEventListener('touchcancel',() => { clearTimeout(holdTimer); clearInterval(holdInterval); });
     }
     content.appendChild(card);
   });
