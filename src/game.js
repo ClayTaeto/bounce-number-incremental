@@ -37,11 +37,14 @@ class Game {
       lightFragments: new Decimal(0),
       primeShards: new Decimal(0),
       lifetimeMoney: new Decimal(0),
+      infinityPoints: new Decimal(0),
       balls: [],
       numbersAdded: 0,
       prestige: 0,
+      infinityPrestige: 0,
       upgrades: {},
       permanentUpgrades: {},
+      infinityUpgrades: {},
       highestTier: 0,
       wallHits: 0,
       prestigeAvailable: false,
@@ -77,11 +80,17 @@ class Game {
   getCapacity() {
     return BASE_CAPACITY
       + (this.state.upgrades.moreCapacity || 0) * 5
-      + (this.state.permanentUpgrades.capacityPlus || 0) * 5;
+      + (this.state.permanentUpgrades.capacityPlus || 0) * 5
+      + (this.state.permanentUpgrades.prestigeCapacity || 0) * 3
+      + (this.state.infinityUpgrades.infCapacity || 0) * 10;
   }
 
   getBaseSpeed() {
-    return (BASE_SPEED + (this.state.upgrades.speedUp || 0) * 20) * this._speedScale();
+    return (BASE_SPEED
+      + (this.state.upgrades.speedUp || 0) * 20
+      + (this.state.permanentUpgrades.prestigeSpeed || 0) * 10
+      + (this.state.infinityUpgrades.infSpeed || 0) * 50
+    ) * this._speedScale();
   }
 
   getLightspeedThreshold() {
@@ -89,8 +98,9 @@ class Game {
   }
 
   getWallMult(wall) {
-    if (wall === 'left')  return 1 + (this.state.upgrades.leftWall  || 0) * 0.5;
-    if (wall === 'right') return 1 + (this.state.upgrades.rightWall || 0) * 0.5;
+    const wallBase = (this.state.permanentUpgrades.prestigeWallBase || 0) * 0.2;
+    if (wall === 'left')  return 1 + (this.state.upgrades.leftWall  || 0) * 0.5 + wallBase;
+    if (wall === 'right') return 1 + (this.state.upgrades.rightWall || 0) * 0.5 + wallBase;
     return 0;
   }
 
@@ -169,7 +179,8 @@ class Game {
     if (newTier > this.state.highestTier) this.state.highestTier = newTier;
     const mergePayLevel = this.state.upgrades.mergePayout || 0;
     if (mergePayLevel > 0) {
-      const bonus = new Decimal(2).pow(newTier).mul(mergePayLevel * 0.1);
+      const mergePowerBonus = 1 + (this.state.permanentUpgrades.prestigeMergePower || 0) * 0.05;
+      const bonus = new Decimal(2).pow(newTier).mul(mergePayLevel * 0.1).mul(mergePowerBonus);
       this.state.money = this.state.money.add(bonus);
       this.state.lifetimeMoney = this.state.lifetimeMoney.add(bonus);
     }
@@ -183,7 +194,10 @@ class Game {
 
   _triggerLightspeed(ball) {
     ball._remove = true;
-    const frags = Math.ceil(Math.max(1, ball.tier / 2) * (1 + (this.state.permanentUpgrades.fragBoost || 0) * 0.25));
+    const fragMult = (1 + (this.state.permanentUpgrades.fragBoost || 0) * 0.25)
+      * (1 + (this.state.permanentUpgrades.prestigeFragBonus || 0) * 0.2)
+      * (1 + (this.state.infinityUpgrades.infFragYield || 0) * 1.0);
+    const frags = Math.ceil(Math.max(1, ball.tier / 2) * fragMult);
     this.state.lightFragments = this.state.lightFragments.add(frags);
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
@@ -250,7 +264,10 @@ class Game {
     else if (sr >= 0.4) speedMult = 1.25;
 
     const now = Date.now();
-    this.state.comboHits = this.state.comboHits.filter(t => now - t < 3000);
+    const comboWindowMs = 3000
+      + (this.state.permanentUpgrades.prestigeComboDecay || 0) * 500
+      + (this.state.infinityUpgrades.infComboWindow || 0) * 2000;
+    this.state.comboHits = this.state.comboHits.filter(t => now - t < comboWindowMs);
     const hits = this.state.comboHits.length;
     let comboMult = 1;
     if (hits >= 200) comboMult = 10;
@@ -263,10 +280,13 @@ class Game {
     const critLevel = this.state.upgrades.critChance || 0;
     let critMult = 1;
     const isCrit = critLevel > 0 && Math.random() < critLevel * 0.05;
-    if (isCrit) critMult = 10;
+    if (isCrit) critMult = 10 + (this.state.permanentUpgrades.prestigeCritMult || 0) * 2;
 
+    const prestigeIncomeMult = 1 + (this.state.permanentUpgrades.prestigeIncome || 0) * 0.1;
+    const infIncomeMult = Math.pow(2, this.state.infinityUpgrades.infIncome || 0);
     const value = new Decimal(2).pow(ball.tier);
-    const payout = value.mul(wallMult).mul(speedMult).mul(comboMult).mul(critMult);
+    const payout = value.mul(wallMult).mul(speedMult).mul(comboMult).mul(critMult)
+      .mul(prestigeIncomeMult).mul(infIncomeMult);
 
     this.state.money = this.state.money.add(payout);
     this.state.lifetimeMoney = this.state.lifetimeMoney.add(payout);
@@ -303,13 +323,24 @@ class Game {
         this.tryMerge();
       }
     }
-    const autoLevel = this.state.upgrades.autoPrinter || 0;
+    const autoLevel = (this.state.upgrades.autoPrinter || 0)
+      + (this.state.permanentUpgrades.prestigeAutoSpeed || 0) * 0.5;
     if (autoLevel > 0) {
       const autoInterval = 1000 / autoLevel;
       if (!this._lastAutoAdd) this._lastAutoAdd = now;
       while (this._lastAutoAdd + autoInterval <= now) {
         this._lastAutoAdd += autoInterval;
         this.tryAdd();
+      }
+    }
+
+    const autoMergeLevel = this.state.infinityUpgrades.infAutoMerge || 0;
+    if (autoMergeLevel > 0) {
+      const autoMergeInterval = 1000 / autoMergeLevel;
+      if (!this._lastAutoMerge) this._lastAutoMerge = now;
+      while (this._lastAutoMerge + autoMergeInterval <= now) {
+        this._lastAutoMerge += autoMergeInterval;
+        this.tryMerge();
       }
     }
   }
@@ -340,19 +371,60 @@ class Game {
 
   prestige() {
     const raw = this.state.lifetimeMoney.div(1e9);
-    const shards = raw.pow(0.5).add(this.state.highestTier).floor().add(1);
+    let shards = raw.pow(0.5).add(this.state.highestTier).floor().add(1);
+    const infPrestigeMultLevel = this.state.infinityUpgrades.infPrestigeMult || 0;
+    if (infPrestigeMultLevel > 0) shards = shards.mul(infPrestigeMultLevel + 1);
     this.state.primeShards = this.state.primeShards.add(shards);
+
     const keepLF = this.state.lightFragments;
     const keepPerm = { ...this.state.permanentUpgrades };
     const keepPrestige = this.state.prestige + 1;
     const keepShards = this.state.primeShards;
+    const keepIP = this.state.infinityPoints;
+    const keepInfinityPrestige = this.state.infinityPrestige;
+    const keepInfinityUpgrades = { ...this.state.infinityUpgrades };
+
     this.state = this._freshState();
     this.state.lightFragments = keepLF;
     this.state.permanentUpgrades = keepPerm;
     this.state.prestige = keepPrestige;
     this.state.primeShards = keepShards;
-    this._spawnBall(0);
+    this.state.infinityPoints = keepIP;
+    this.state.infinityPrestige = keepInfinityPrestige;
+    this.state.infinityUpgrades = keepInfinityUpgrades;
+
+    const startTier = keepInfinityUpgrades.infStartTier || 0;
+    this._spawnBall(startTier);
+    const extraBalls = keepPerm.prestigeStartBalls || 0;
+    for (let i = 0; i < extraBalls; i++) this._spawnBall(startTier);
+
+    this._buildUpgradeTabs();
     this._renderUpgradeCards();
+    saveGame(this.state, this.canvas.width, this.canvas.height);
+  }
+
+  breakInfinity() {
+    // Calculate infinity points: floor(sqrt(primeShards / 10)) + 1
+    const ip = this.state.primeShards.div(10).sqrt().floor().add(1);
+
+    const keepLF = this.state.lightFragments;
+    const keepPerm = { ...this.state.permanentUpgrades };
+    const keepInfinityPrestige = this.state.infinityPrestige + 1;
+    const keepInfinityUpgrades = { ...this.state.infinityUpgrades };
+    const keepIP = this.state.infinityPoints.add(ip);
+
+    this.state = this._freshState();
+    this.state.lightFragments = keepLF;
+    this.state.permanentUpgrades = keepPerm;
+    this.state.infinityPrestige = keepInfinityPrestige;
+    this.state.infinityUpgrades = keepInfinityUpgrades;
+    this.state.infinityPoints = keepIP;
+
+    const startTier = keepInfinityUpgrades.infStartTier || 0;
+    this._spawnBall(startTier);
+
+    this._renderUpgradeCards();
+    this._buildUpgradeTabs();
     saveGame(this.state, this.canvas.width, this.canvas.height);
   }
 
@@ -395,6 +467,8 @@ class Game {
     const pairs = this._countPairs();
     document.getElementById('merge-pairs-display').textContent = pairs + (pairs === 1 ? ' pair' : ' pairs');
     document.getElementById('btn-prestige').style.display = this.state.prestigeAvailable ? '' : 'none';
+    const biBtn = document.getElementById('btn-break-infinity');
+    if (biBtn) biBtn.style.display = this.state.prestige >= 10 ? '' : 'none';
 
     // Rebuild upgrade cards at most 4×/sec to avoid thrashing the DOM
     const now = Date.now();
@@ -450,6 +524,15 @@ class Game {
         this.prestige();
       }
     });
+
+    const biBtn = document.getElementById('btn-break-infinity');
+    if (biBtn) {
+      biBtn.addEventListener('click', () => {
+        if (this.state.prestige >= 10 && confirm('Break Infinity? All prestige progress resets, but you keep Light Fragments, permanent upgrades, and earn Infinity Points.')) {
+          this.breakInfinity();
+        }
+      });
+    }
 
     // Click on canvas → find nearest ball and redirect it away from click point
     this.canvas.addEventListener('click', e => {
