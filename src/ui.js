@@ -1,3 +1,35 @@
+function drawSparkline(canvas, history) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.length < 2) return;
+
+  const values = history.map(d => d.v);
+  const maxVal = Math.max(...values, 0.001);
+
+  // Determine trend color
+  const last = values[values.length - 1];
+  const prev = values[values.length - 2];
+  let color = '#ffeb3b'; // flat
+  if (last > prev * 1.02) color = '#4caf50';      // rising
+  else if (last < prev * 0.98) color = '#f44336';  // dropping
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+
+  for (let i = 0; i < values.length; i++) {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - (values[i] / maxVal) * (h - 2) - 1;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
 function buildUpgradeTabs(game) {
   const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab)), 'Achievements', 'Challenges'];
   const el = document.getElementById('upgrade-tabs');

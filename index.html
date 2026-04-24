@@ -289,6 +289,88 @@
     .ach-name { font-size: 10px; color: #ddd; font-weight: bold; }
     .ach-desc { font-size: 9px; color: #777; line-height: 1.3; }
     .ach-count { font-size: 11px; color: #ffd700; text-align: center; padding: 6px 0 2px; }
+
+    /* ── COMBO METER ── */
+    #combo-meter-container { margin: 6px 0 4px; }
+    #combo-meter-label { font-size: 12px; color: #888; }
+    #combo-mult-display { color: #ccc; font-weight: bold; }
+    #combo-bar-bg { width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 4px 0; }
+    #combo-bar-fill { height: 100%; width: 0%; transition: width 0.1s, background-color 0.3s; background: #4caf50; }
+    #combo-next-hint { font-size: 10px; color: #888; }
+
+    /* ── INCOME SPARKLINE ── */
+    #income-sparkline { display: block; margin: 4px 0; border-radius: 3px; background: rgba(255,255,255,0.03); }
+
+    /* ── SETTINGS BUTTON ── */
+    #btn-settings {
+      background: none;
+      border: 1px solid #333;
+      color: #888;
+      font-size: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.1s, border-color 0.1s;
+    }
+    #btn-settings:hover { color: #ccc; border-color: #555; }
+
+    /* ── SETTINGS PANEL ── */
+    #settings-panel {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #settings-inner {
+      background: #111120;
+      border: 1px solid #3344aa;
+      border-radius: 10px;
+      padding: 24px 28px;
+      min-width: 240px;
+    }
+    #settings-inner h2 { color: #8899ff; font-size: 16px; margin-bottom: 16px; }
+    .setting-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 13px; color: #ccc; cursor: pointer; }
+    .setting-row input[type=checkbox] { accent-color: #5566cc; width: 15px; height: 15px; cursor: pointer; }
+    #btn-close-settings {
+      margin-top: 16px;
+      width: 100%;
+      padding: 8px;
+      background: #1a2240;
+      border: 1px solid #3344aa;
+      border-radius: 5px;
+      color: #88aaff;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #btn-close-settings:hover { background: #1e2a50; }
+
+    /* ── PRESTIGE PULSE ── */
+    @keyframes prestige-pulse {
+      0%, 100% { box-shadow: 0 0 8px #ffd700; }
+      50% { box-shadow: 0 0 20px #ffd700, 0 0 40px #ffa000; }
+    }
+    .prestige-available { animation: prestige-pulse 1.5s ease-in-out infinite; }
+    @keyframes prestige-hint-fadein {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #prestige-hint {
+      display: none;
+      font-size: 11px;
+      color: #ffd700;
+      text-align: center;
+      animation: prestige-hint-fadein 0.4s ease;
+      margin-bottom: 2px;
+    }
   </style>
 </head>
 <body>
@@ -302,6 +384,17 @@
     <button id="btn-mute" title="Mute/Unmute" style="background:none;border:1px solid #333;color:#ccc;font-size:16px;padding:2px 8px;border-radius:4px;cursor:pointer;font-family:inherit;">🔊</button>
     <input type="range" id="vol-music" min="0" max="100" value="15" title="Music Volume" style="width:60px">
     <input type="range" id="vol-sfx" min="0" max="100" value="40" title="SFX Volume" style="width:60px">
+    <button id="btn-settings" title="Settings">⚙</button>
+  </div>
+
+  <div id="settings-panel" style="display:none">
+    <div id="settings-inner">
+      <h2>Settings</h2>
+      <label class="setting-row"><input type="checkbox" id="setting-mute"> Mute (placeholder)</label>
+      <label class="setting-row"><input type="checkbox" id="setting-particles" checked> Particle Effects</label>
+      <label class="setting-row"><input type="checkbox" id="setting-shake" checked> Screen Shake</label>
+      <button id="btn-close-settings">Close</button>
+    </div>
   </div>
 
   <div id="main-area">
@@ -310,6 +403,12 @@
       <h3>Stats</h3>
       <div class="stat-row"><span class="stat-label">Numbers</span><span class="stat-val" id="stat-numbers">0/20</span></div>
       <div class="stat-row"><span class="stat-label">Combo</span><span class="stat-val" id="stat-combo">x1.0</span></div>
+      <div id="combo-meter-container">
+        <div id="combo-meter-label">Combo: <span id="combo-mult-display">x1.0</span></div>
+        <div id="combo-bar-bg"><div id="combo-bar-fill"></div></div>
+        <div id="combo-next-hint"></div>
+      </div>
+      <canvas id="income-sparkline" width="120" height="30"></canvas>
       <div class="stat-row"><span class="stat-label">Wall Hits</span><span class="stat-val" id="stat-hits">0</span></div>
       <div class="stat-row"><span class="stat-label">Crit %</span><span class="stat-val" id="stat-crit">0%</span></div>
       <div class="stat-row"><span class="stat-label">Speed</span><span class="stat-val" id="stat-speed">180</span></div>
@@ -361,7 +460,10 @@
       Merge
       <span class="btn-sub" id="merge-pairs-display">0 pairs</span>
     </button>
-    <button id="btn-prestige">✦ Prestige</button>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div id="prestige-hint">✨ PRESTIGE ✨</div>
+      <button id="btn-prestige">✦ Prestige</button>
+    </div>
   </div>
 
   <div id="offline-popup" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
