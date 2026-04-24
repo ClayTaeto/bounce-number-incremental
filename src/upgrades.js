@@ -80,6 +80,119 @@ const UPGRADES = [
     unlockCondition: s => s.highestTier >= 7,
   },
 
+  // ── Add tab extras ───────────────────────────────────────────────────────────
+  {
+    id: 'holdBoost', tab: 'Add',
+    name: 'Hold Multiplier', desc: 'Hold Add for a 3s income boost',
+    maxLevel: 5, baseCost: 150, costMult: 2.5,
+    effect: l => l > 0 ? `+${l * 5}% income for 3s after adding` : 'Income boost on hold-add',
+    unlockCondition: s => s.highestTier >= 2,
+  },
+  {
+    id: 'massProduction', tab: 'Add',
+    name: 'Mass Production', desc: 'Each ball adds +1% income bonus per level',
+    maxLevel: 5, baseCost: 400, costMult: 3,
+    effect: l => l > 0 ? `+${l}% income per ball in arena` : 'More balls = more money',
+    unlockCondition: s => s.highestTier >= 4,
+  },
+  {
+    id: 'bulkAdder', tab: 'Add',
+    name: 'Bulk Add', desc: 'Adds extra free balls when Add is clicked',
+    maxLevel: 5, baseCost: 300, costMult: 4,
+    effect: l => l > 0 ? `+${l} free balls per add` : 'Spawn extra balls on add',
+    unlockCondition: s => s.highestTier >= 5,
+  },
+
+  // ── Merge tab extras ─────────────────────────────────────────────────────────
+  {
+    id: 'chainMerge', tab: 'Merge',
+    name: 'Chain Merge', desc: 'First merge after a merge is free and instant',
+    maxLevel: 3, baseCost: 500, costMult: 4,
+    effect: l => l > 0 ? `Free merge window: ${l}s` : 'Chain merges together',
+    unlockCondition: s => s.highestTier >= 3,
+  },
+  {
+    id: 'mergeCombo', tab: 'Merge',
+    name: 'Merge Combo', desc: 'Consecutive merges increase merge payout',
+    maxLevel: 5, baseCost: 600, costMult: 3,
+    effect: l => l > 0 ? `+${l * 10}% per merge in 3s window` : 'Combo merge payouts',
+    unlockCondition: s => s.highestTier >= 4,
+  },
+  {
+    id: 'megaMerge', tab: 'Merge',
+    name: 'Mega Merge', desc: 'Chance to merge 4 balls into tier+2',
+    maxLevel: 4, baseCost: 2000, costMult: 5,
+    effect: l => l > 0 ? `${l * 5}% chance for 4→1 merge` : 'Merge 4 into tier+2',
+    unlockCondition: s => s.highestTier >= 7,
+  },
+  {
+    id: 'splitMerge', tab: 'Merge',
+    name: 'Bonus Split', desc: 'High-tier merges may spawn a free tier-0 ball',
+    maxLevel: 4, baseCost: 1500, costMult: 4,
+    effect: l => l > 0 ? `${l * 25}% chance to spawn tier-0 on merge (tier>=10)` : 'Bonus ball on big merges',
+    unlockCondition: s => s.highestTier >= 10,
+  },
+
+  // ── Numbers tab extras ───────────────────────────────────────────────────────
+  {
+    id: 'ballMagnet', tab: 'Numbers',
+    name: 'Ball Magnet', desc: 'Slow balls drift toward the center',
+    maxLevel: 3, baseCost: 350, costMult: 3,
+    effect: l => l > 0 ? `Center pull at <60% speed (x${l})` : 'Slow balls gravitate to center',
+    unlockCondition: s => s.highestTier >= 4,
+  },
+  {
+    id: 'speedRamp', tab: 'Numbers',
+    name: 'Speed Ramp', desc: 'Balls gradually accelerate over time',
+    maxLevel: 5, baseCost: 250, costMult: 2.5,
+    effect: l => l > 0 ? `Ramp to ${100 + l * 10}% base speed` : 'Balls slowly speed up',
+    unlockCondition: s => s.highestTier >= 3,
+  },
+  {
+    id: 'elasticBounce', tab: 'Numbers',
+    name: 'Elastic Bounce', desc: 'Wall bounces preserve extra speed',
+    maxLevel: 5, baseCost: 400, costMult: 3,
+    effect: l => l > 0 ? `+${l * 5}% speed on each wall hit` : 'Bouncy walls',
+    unlockCondition: s => s.highestTier >= 5,
+  },
+  {
+    id: 'traitChance', tab: 'Numbers',
+    name: 'Trait Spawn', desc: 'New balls may spawn with special traits',
+    maxLevel: 5, baseCost: 800, costMult: 3,
+    effect: l => l > 0 ? `${l * 5}% chance for trait on spawn` : 'Enable trait balls',
+    unlockCondition: s => s.highestTier >= 6,
+  },
+
+  // ── Walls tab extras ─────────────────────────────────────────────────────────
+  {
+    id: 'wallSynergy', tab: 'Walls',
+    name: 'Wall Synergy', desc: 'Left/right multipliers also boost top/bottom',
+    maxLevel: 1, baseCost: 1200, costMult: 1,
+    effect: l => l > 0 ? 'Top/bottom get 50% of L/R mult bonus' : 'Synergize wall multipliers',
+    unlockCondition: s => s.highestTier >= 6,
+  },
+  {
+    id: 'critCombo', tab: 'Walls',
+    name: 'Crit Combo', desc: 'Critical hits also apply the combo multiplier',
+    maxLevel: 1, baseCost: 800, costMult: 1,
+    effect: l => l > 0 ? 'Crits × combo multiplier' : 'Combo-boosted crits',
+    unlockCondition: s => s.highestTier >= 8,
+  },
+  {
+    id: 'wallMemory', tab: 'Walls',
+    name: 'Wall Memory', desc: 'Unique wall hits in 5s add income bonus',
+    maxLevel: 5, baseCost: 700, costMult: 3,
+    effect: l => l > 0 ? `+${l * 5}% per unique wall hit in 5s` : 'Reward hitting all walls',
+    unlockCondition: s => s.highestTier >= 6,
+  },
+  {
+    id: 'richWalls', tab: 'Walls',
+    name: 'Rich Walls', desc: 'Current money boosts wall payout',
+    maxLevel: 5, baseCost: 1000, costMult: 3.5,
+    effect: l => l > 0 ? `+${l}% per $1000 held, cap 50%` : 'Wealth feeds income',
+    unlockCondition: s => s.highestTier >= 8,
+  },
+
   // ── Lightspeed upgrades — unlock after first Light Fragment ─────────────────
   {
     id: 'lsBuffer', tab: 'Lightspeed',
@@ -96,6 +209,30 @@ const UPGRADES = [
     persistent: true, currency: 'lightFragments',
     effect: l => l > 0 ? `+${l * 25}% fragment yield` : 'Bonus Light Frags',
     unlockCondition: s => s.lightFragments.gte(3),
+  },
+  {
+    id: 'lightShard', tab: 'Lightspeed',
+    name: 'Light Shard Multiplier', desc: 'Multiplies Light Fragment value for prestige',
+    maxLevel: 5, baseCost: 5, costMult: 3,
+    persistent: true, currency: 'lightFragments',
+    effect: l => l > 0 ? `Fragment value x${Math.pow(2, l).toFixed(0)}` : 'Boost fragment prestige value',
+    unlockCondition: s => s.lightFragments.gte(5),
+  },
+  {
+    id: 'speedConverter', tab: 'Lightspeed',
+    name: 'Speed Converter', desc: 'Lightspeed balls also earn bonus money',
+    maxLevel: 5, baseCost: 8, costMult: 3,
+    persistent: true, currency: 'lightFragments',
+    effect: l => l > 0 ? `Earn ${l * 10}% of ball speed as money` : 'Money from lightspeed',
+    unlockCondition: s => s.lightFragments.gte(10),
+  },
+  {
+    id: 'lsBonus', tab: 'Lightspeed',
+    name: 'Lightspeed Cascade', desc: 'Lightspeed removal boosts remaining balls',
+    maxLevel: 3, baseCost: 4, costMult: 3,
+    persistent: true, currency: 'lightFragments',
+    effect: l => l > 0 ? `+${l * 10}% speed to remaining balls on LS` : 'Cascade speed boost',
+    unlockCondition: s => s.lightFragments.gte(8),
   },
 ];
 

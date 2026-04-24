@@ -150,6 +150,53 @@ function renderBall(ctx, ball, threshold) {
     ctx.stroke();
   }
 
+  // Trait visuals
+  if (ball.trait === 'golden') {
+    ctx.save();
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ffd700';
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, r + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (ball.trait === 'hot') {
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#ff4400';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (ball.trait === 'heavy') {
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = '#333355';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#888899';
+    ctx.font = `${Math.max(8, r * 0.5)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('▪', ball.x, ball.y + r * 0.3);
+    ctx.restore();
+  }
+
+  if (ball.trait === 'lucky') {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#ffe000';
+    ctx.font = `${Math.max(8, r * 0.55)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('★', ball.x, ball.y - r - 2);
+    ctx.restore();
+  }
+
   // Number label
   const fontSize = Math.max(9, Math.min(r * 0.85, 16));
   ctx.fillStyle = ball.tier <= 2 ? '#1a1a2e' : '#0a0a14';
