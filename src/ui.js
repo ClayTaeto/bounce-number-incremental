@@ -1,5 +1,5 @@
 function buildUpgradeTabs(game) {
-  const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab))];
+  const tabs = ['All', ...new Set(UPGRADES.map(u => u.tab)), 'Achievements'];
   const el = document.getElementById('upgrade-tabs');
   el.innerHTML = '';
   tabs.forEach(tab => {
@@ -16,8 +16,57 @@ function buildUpgradeTabs(game) {
   });
 }
 
+function renderAchievements(game, content) {
+  const sys = game._achievementSystem;
+  const all = window.ACHIEVEMENTS || [];
+  const unlockedCount = sys ? sys.getUnlocked().length : 0;
+
+  const countEl = document.createElement('div');
+  countEl.className = 'ach-count';
+  countEl.textContent = `${unlockedCount} / ${all.length} Unlocked`;
+  content.appendChild(countEl);
+
+  const grid = document.createElement('div');
+  grid.className = 'ach-grid';
+
+  all.forEach(ach => {
+    const unlocked = sys ? sys.isUnlocked(ach.id) : false;
+    const card = document.createElement('div');
+    card.className = 'ach-card ' + (unlocked ? 'unlocked' : 'locked');
+
+    const icon = document.createElement('div');
+    icon.className = 'ach-icon';
+    icon.textContent = unlocked ? ach.icon : '?';
+
+    const name = document.createElement('div');
+    name.className = 'ach-name';
+    name.textContent = ach.name;
+
+    card.appendChild(icon);
+    card.appendChild(name);
+
+    if (unlocked) {
+      const desc = document.createElement('div');
+      desc.className = 'ach-desc';
+      desc.textContent = ach.desc;
+      card.appendChild(desc);
+    }
+
+    grid.appendChild(card);
+  });
+
+  content.appendChild(grid);
+}
+
 function renderUpgradeCards(game) {
   const content = document.getElementById('upgrade-content');
+
+  if (game._currentTab === 'Achievements') {
+    content.innerHTML = '';
+    renderAchievements(game, content);
+    return;
+  }
+
   const filter = game._currentTab === 'All' ? null : game._currentTab;
   const visible = getVisibleUpgrades(game.state, filter);
 

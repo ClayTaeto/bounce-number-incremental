@@ -30,6 +30,8 @@ class Game {
       this.state._offlineEarnings = null;
     }
 
+    this._achievementSystem = new AchievementSystem();
+
     this._buildUpgradeTabs();
     this._renderUpgradeCards();
     this._bindInput();
@@ -416,11 +418,12 @@ class Game {
     document.getElementById('merge-pairs-display').textContent = pairs + (pairs === 1 ? ' pair' : ' pairs');
     document.getElementById('btn-prestige').style.display = this.state.prestigeAvailable ? '' : 'none';
 
-    // Rebuild upgrade cards at most 4×/sec to avoid thrashing the DOM
+    // Rebuild upgrade cards and check achievements at most 4×/sec to avoid thrashing the DOM
     const now = Date.now();
     if (!this._lastCardRebuild || now - this._lastCardRebuild > 250) {
       this._lastCardRebuild = now;
       this._renderUpgradeCards();
+      this._achievementSystem.check(this.state);
     }
   }
 
