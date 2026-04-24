@@ -160,6 +160,69 @@ function renderWalls(ctx, state, game, w, h) {
   }
 }
 
+function renderBumpers(ctx, game, w, h) {
+  const bumpers = game._getBumpers();
+  if (bumpers.length === 0) return;
+  const now = performance.now();
+
+  for (const b of bumpers) {
+    const bx = b.fx * w, by = b.fy * h;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 400 + b.fx * 10);
+    const r = b.radius;
+
+    ctx.save();
+
+    const glowR = r + 6 + pulse * 5;
+    const grd = ctx.createRadialGradient(bx, by, r * 0.3, bx, by, glowR);
+    grd.addColorStop(0, `rgba(255, 140, 60, ${0.35 + pulse * 0.2})`);
+    grd.addColorStop(1, 'rgba(255, 140, 60, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(bx, by, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bg = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.3, r * 0.05, bx, by, r);
+    bg.addColorStop(0, '#ffe0a0');
+    bg.addColorStop(0.4, '#ff9040');
+    bg.addColorStop(1, '#cc4000');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 220, 100, ${0.6 + pulse * 0.4})`;
+    ctx.lineWidth = 1.5 + pulse * 1.5;
+    ctx.beginPath();
+    ctx.arc(bx, by, r + 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a0a00';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`x${b.payoutMult.toFixed(1)}`, bx, by);
+
+    ctx.restore();
+  }
+}
+
+function renderTrails(ctx, balls) {
+  for (const ball of balls) {
+    if (!ball._trail || ball._trail.length === 0) continue;
+    const info = getTierInfo(ball.tier);
+    const len = ball._trail.length;
+    for (let i = 0; i < len; i++) {
+      const pt = ball._trail[i];
+      ctx.globalAlpha = (i + 1) / (len + 1) * 0.5;
+      ctx.fillStyle = info.color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, Math.max(1.5, ball.radius * 0.3 * ((i + 1) / len)), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
 function renderBall(ctx, ball, threshold) {
   const info = getTierInfo(ball.tier);
   const r = ball.radius * (ball.popScale || 1);
