@@ -54,15 +54,14 @@ The game needs intentional moments where the player feels like they found a bust
 
 ## 4. Target Platform
 
-Primary:
+**Release target: Steam only. Supported hardware: PC and Steam Deck.**
 
-* PC / Steam
+The game is built with web technology wrapped in NW.js (see §21.1) and ships exclusively on Steam. No separate web release, no itch.io, no mobile.
 
-Secondary:
+* **PC** — primary target. Mouse + keyboard. Any resolution.
+* **Steam Deck** — secondary target. Controller + trackpad. 1280×800 display. Must achieve at minimum Steam Deck **Playable** rating; target **Verified**.
 
-* Web demo on itch.io or Steam Next Fest demo
-
-Mobile is not a secondary target. Hold-to-rapid-fire is the core input mechanic. Holding buttons for extended periods on a touchscreen is fatiguing and would require a fundamental redesign of the add/merge loop. Mobile should only be considered if the input model is redesigned first.
+Mobile is excluded because hold-to-rapid-fire is the core input mechanic — holding buttons on a touchscreen is fatiguing and would require redesigning the entire add/merge loop. Do not scope or promise any other platform.
 
 Recommended price:
 
@@ -876,7 +875,28 @@ Hotkeys:
 * `Space`: Activate special ability / overdrive
 * `Tab`: Cycle panels
 
-Controller support optional but not required for v1.
+### Controller (Steam Deck + Gamepad)
+
+Full controller support is required for Steam Deck Verified status. The game's inputs are simple enough that mapping is straightforward.
+
+Suggested default controller layout:
+
+| Action               | Button            |
+| -------------------- | ----------------- |
+| Add 1                | A (face button)   |
+| Hold Add 1           | Hold A            |
+| Merge                | X (face button)   |
+| Hold Merge           | Hold X            |
+| Open upgrades        | Y                 |
+| Prestige menu        | Start / Menu      |
+| Navigate upgrades    | D-pad / L stick   |
+| Confirm upgrade      | A                 |
+| Special / Overdrive  | R trigger         |
+| Zoom                 | R stick           |
+
+The trackpad on the Steam Deck can emulate mouse for navigating the upgrade shop if controller navigation feels clunky. Both input modes should work simultaneously.
+
+Hold-to-rapid-fire must work with held face buttons — this is the core feel. Test this thoroughly on real Steam Deck hardware before submission.
 
 ## 12. UI Design
 
@@ -892,6 +912,14 @@ Recommended layout:
 * Top right: prestige progress + Light Fragments counter.
 * Right panel: upgrades.
 * Left panel: stats/build info.
+
+**Steam Deck / 1280×800 considerations:**
+
+* Design the base layout at 1280×800. PC players at higher resolutions get a larger arena, not more UI.
+* All text must be readable at 7 inches from ~50cm viewing distance. Minimum readable font size: 14px equivalent at 1280×800. Number values in the arena should be larger.
+* Upgrade cards in the right panel must be navigable with a D-pad — use a clear selection highlight and scroll behavior.
+* The Add 1 and Merge buttons must be large enough to hit with thumbstick-controlled cursor if the player is not using face buttons.
+* No required UI element should appear in the outer 40px edge of the screen (Steam Deck bezel safe zone).
 
 #### 12.1.1 Add Button
 
@@ -1028,7 +1056,7 @@ Prototype success criteria:
 
 ### 14.2 Demo Scope
 
-Goal: Steam demo / itch demo.
+Goal: Steam Next Fest demo (Steam only).
 
 Features:
 
@@ -1294,6 +1322,24 @@ A strong trailer should show:
 
 The trailer should communicate the whole loop without narration.
 
+### 19.4 Steam Deck Verified Checklist
+
+Valve's review process checks these. Design against them from the start rather than patching at submission.
+
+| Requirement | Status | Notes |
+| --- | --- | --- |
+| Launches without keyboard/mouse | Required | All actions mappable to controller (§11) |
+| Default controller config provided | Required | Ship a recommended Steam Input layout |
+| All UI navigable with controller | Required | D-pad navigation for upgrade shop |
+| No text too small to read at 1280×800 | Required | Min 14px equivalent (§12.1) |
+| No UI cut off at 1280×800 | Required | 40px safe zone on all edges |
+| No Windows-only functionality | Required | Ship native Linux build |
+| Steam Overlay functional | Required | Automatic via NW.js + Steamworks init |
+| No required launcher before game | Required | NW.js app launches directly |
+| Gyro/touchscreen not required | Automatic | Game uses face buttons, not motion |
+
+Submit for Deck review only after all items pass internal testing. A "Playable" rating (yellow) is acceptable at launch if controller navigation in the upgrade shop needs more polish; target Verified (green) within the first post-launch patch.
+
 ## 20. Art Direction
 
 ### 20.1 Style
@@ -1350,20 +1396,43 @@ Unlockable themes:
 
 ### 21.1 Engine Recommendation
 
-Good fits:
+**Stack: Web technology wrapped in NW.js for Steam.**
 
-* Godot 4
-* Unity
-* Web build with PixiJS + Matter.js / custom physics
+Build the game in the browser, ship it as a desktop app via NW.js. NW.js ships a bundled Chromium (guaranteed WebGL 2 support on all platforms), uses a single execution context (no main/renderer process split like Electron), and has a simpler app model well-suited to games. Bundle size is roughly equivalent to Electron but the architecture is less complex.
 
-For this specific game, Godot is a strong fit because:
+**Web stack:**
 
-* 2D physics is built in.
-* UI is solid enough for an incremental game.
-* Export to Steam is straightforward.
-* The scope is manageable for a small team/solo dev.
+* **Renderer:** PixiJS (WebGL 2D, excellent performance for many moving sprites)
+* **Physics:** Matter.js for prototype; consider replacing with a custom lightweight bouncer (axis-aligned walls + circle collision only) for production — the physics here are simple enough that a full engine adds unnecessary overhead
+* **BigNumber:** `break_infinity.js` (fast, approximate, purpose-built for incrementals) — swap to `decimal.js` only if precision bugs appear
+* **State/save:** plain JSON to `localStorage` in dev; write to disk via NW.js's Node.js `fs` API in production for a reliable save file path
 
-**BigNumber requirement:** All value and money representations must use a big-number library from the start. JavaScript's `Number` type loses precision above 2^53 (~9 quadrillion). Options: `decimal.js` (accurate, slower), `break_infinity.js` (approximate, fast, built for incrementals). Choose before writing any economy code — retrofitting is expensive.
+**NW.js + Steam integration:**
+
+* Use `greenworks` (wraps the Steamworks SDK for NW.js/Node.js) for achievements, cloud save, and overlay
+* NW.js's bundled Chromium means the Steam overlay injects correctly — test this early
+* Ship a Windows build as primary; provide a Linux build for native Steam Deck support (see below)
+
+**Steam Deck deployment:**
+
+NW.js runs natively on Linux (x64). Two options:
+
+1. **Native Linux build** — compile NW.js for Linux, ship as a Steam Linux build. Runs without Proton on Steam Deck. WebGL via Mesa/RADV drivers on the Deck is solid for 2D PixiJS.
+2. **Windows build via Proton** — ship Windows only, Steam Deck runs it through Proton. Chromium-based apps have good Proton compatibility. Simpler to maintain one build.
+
+Recommended: **ship both.** Linux build for Deck-native experience and Verified status; Windows build as the primary.
+
+NW.js on Linux may require `--no-sandbox` flag in the launch options on SteamOS — add this to the Steam launch configuration and document it.
+
+**Steam-specific integrations required:**
+
+* Achievements → Steamworks via `greenworks`
+* Cloud save → Steam Remote Storage via `greenworks`
+* Overlay → automatic with NW.js + Steamworks initialized
+* Input → Steam Input API for controller remapping and Steam Deck button prompts (show Deck button icons when a controller is detected)
+* DRM → Steam's built-in, no extra work needed
+
+**BigNumber requirement:** All value and money representations must use a big-number library from the start. `Number` loses precision above 2^53 (~9 quadrillion). Choose before writing any economy code — retrofitting is expensive.
 
 ### 21.2 Physics Strategy
 
