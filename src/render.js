@@ -2,6 +2,19 @@ function renderArena(ctx, state, game) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
 
+  ctx.save();
+
+  // Screen shake
+  if (state._shakeEnabled !== false && state._shakeIntensity > 0.5) {
+    const dx = (Math.random() - 0.5) * state._shakeIntensity;
+    const dy = (Math.random() - 0.5) * state._shakeIntensity;
+    ctx.translate(dx, dy);
+  }
+  if (state._shakeIntensity > 0) {
+    state._shakeIntensity *= 0.85;
+    if (state._shakeIntensity < 0.1) state._shakeIntensity = 0;
+  }
+
   ctx.fillStyle = '#0a0a10';
   ctx.fillRect(0, 0, w, h);
 
@@ -16,10 +29,13 @@ function renderArena(ctx, state, game) {
   }
 
   renderWalls(ctx, state, game, w, h);
-  if (state._particles) renderParticles(ctx, state._particles);
+  if (state._particlesEnabled !== false && state._particles) renderParticles(ctx, state._particles);
   const threshold = game.getLightspeedThreshold();
+  renderTrails(ctx, state.balls);
   for (const ball of state.balls) renderBall(ctx, ball, threshold);
   if (state._popups) renderPopups(ctx, state._popups);
+
+  ctx.restore();
 }
 
 function renderWalls(ctx, state, game, w, h) {
@@ -67,6 +83,23 @@ function renderWalls(ctx, state, game, w, h) {
   ctx.rotate(Math.PI / 2);
   ctx.fillText(`x${rm.toFixed(1)}`, 0, 0);
   ctx.restore();
+}
+
+function renderTrails(ctx, balls) {
+  for (const ball of balls) {
+    if (!ball._trail || ball._trail.length === 0) continue;
+    const info = getTierInfo(ball.tier);
+    const len = ball._trail.length;
+    for (let i = 0; i < len; i++) {
+      const pt = ball._trail[i];
+      ctx.globalAlpha = (i + 1) / (len + 1) * 0.5;
+      ctx.fillStyle = info.color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, Math.max(1.5, ball.radius * 0.3 * ((i + 1) / len)), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 function renderBall(ctx, ball, threshold) {

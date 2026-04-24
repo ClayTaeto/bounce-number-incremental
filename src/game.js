@@ -1,9 +1,24 @@
+// Static combo threshold table — defined once, read every frame
+const COMBO_THRESHOLDS = [
+  { min: 0,   next: 5,   mult: 1.0,  color: '#555555' },
+  { min: 5,   next: 15,  mult: 1.1,  color: '#4caf50' },
+  { min: 15,  next: 50,  mult: 1.5,  color: '#ffeb3b' },
+  { min: 50,  next: 200, mult: 3.0,  color: '#ff9800' },
+  { min: 200, next: null, mult: 10.0, color: '#f44336' },
+];
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('arena');
     this.ctx = this.canvas.getContext('2d');
     this._ballId = 0;
     this.state = this._freshState();
+
+    // Cache DOM refs used every frame
+    this._elComboFill = null;
+    this._elComboHint = null;
+    this._elComboMult = null;
+    this._elSparkline = null;
 
     this._addHeld = false;
     this._addHoldStart = 0;
@@ -27,6 +42,13 @@ class Game {
     this._buildUpgradeTabs();
     this._renderUpgradeCards();
     this._bindInput();
+
+    // Cache frequently-accessed DOM elements
+    this._elComboFill = document.getElementById('combo-bar-fill');
+    this._elComboHint = document.getElementById('combo-next-hint');
+    this._elComboMult = document.getElementById('combo-mult-display');
+    this._elSparkline = document.getElementById('income-sparkline');
+
     this._lastTime = performance.now();
     requestAnimationFrame(ts => this._loop(ts));
   }
@@ -50,6 +72,10 @@ class Game {
       incomePerSec: new Decimal(0),
       _particles: [],
       _popups: [],
+      _incomeHistory: [],
+      _shakeIntensity: 0,
+      _particlesEnabled: true,
+      _shakeEnabled: true,
     };
   }
 
@@ -199,11 +225,33 @@ class Game {
     for (const ball of this.state.balls) {
       if (ball._remove) continue;
       if (ball.popScale > 1) ball.popScale = Math.max(1, ball.popScale - dt * 6);
+
+      // Update trail for high-tier balls (tier >= 6)
+      if (ball.tier >= 6) {
+        if (!ball._trail) ball._trail = [];
+        const last = ball._trail[ball._trail.length - 1];
+        const dx = ball.x - (last ? last.x : ball.x);
+        const dy = ball.y - (last ? last.y : ball.y);
+        if (!last || Math.sqrt(dx * dx + dy * dy) > ball.radius) {
+          ball._trail.push({ x: ball.x, y: ball.y });
+          if (ball._trail.length > 3) ball._trail.shift();
+        }
+      }
+
       ball.x += ball.vx * dt;
       ball.y += ball.vy * dt;
 
       const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
       if (spd >= threshold) { this._triggerLightspeed(ball); continue; }
+
+      // Near-lightspeed particles
+      if (this.state._particlesEnabled !== false && spd / threshold > 0.85 && Math.random() < 0.3) {
+        this.state._particles.push({
+          x: ball.x, y: ball.y,
+          vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30,
+          life: 0.4, size: 2, color: '#aaddff',
+        });
+      }
 
       // Anti-stuck nudge
       if (spd < 25) {
@@ -264,6 +312,11 @@ class Game {
     let critMult = 1;
     const isCrit = critLevel > 0 && Math.random() < critLevel * 0.05;
     if (isCrit) critMult = 10;
+
+    // Screen shake on high-tier crit hits
+    if (isCrit && ball.tier >= 8 && this.state._shakeEnabled !== false) {
+      this.state._shakeIntensity = Math.min(6, ball.tier * 0.4);
+    }
 
     const value = new Decimal(2).pow(ball.tier);
     const payout = value.mul(wallMult).mul(speedMult).mul(comboMult).mul(critMult);
@@ -336,6 +389,14 @@ class Game {
     let total = new Decimal(0);
     for (const x of this._lastIncomeWindow) total = total.add(x.v);
     this.state.incomePerSec = total.div(3);
+
+    // Sample income history every 2 seconds for sparkline
+    if (!this._lastIncomeSample) this._lastIncomeSample = now;
+    if (now - this._lastIncomeSample >= 2000) {
+      this._lastIncomeSample = now;
+      this.state._incomeHistory.push({ t: now, v: parseFloat(this.state.incomePerSec.toFixed(4)) });
+      if (this.state._incomeHistory.length > 30) this.state._incomeHistory.shift();
+    }
   }
 
   prestige() {
@@ -394,13 +455,47 @@ class Game {
 
     const pairs = this._countPairs();
     document.getElementById('merge-pairs-display').textContent = pairs + (pairs === 1 ? ' pair' : ' pairs');
-    document.getElementById('btn-prestige').style.display = this.state.prestigeAvailable ? '' : 'none';
+    const prestigeBtn = document.getElementById('btn-prestige');
+    prestigeBtn.style.display = this.state.prestigeAvailable ? '' : 'none';
+    prestigeBtn.classList.toggle('prestige-available', this.state.prestigeAvailable);
+    const prestigeHint = document.getElementById('prestige-hint');
+    if (prestigeHint) prestigeHint.style.display = this.state.prestigeAvailable ? '' : 'none';
+
+    // Update combo meter
+    this._updateComboMeter();
+
+    // Draw income sparkline
+    if (this._elSparkline) drawSparkline(this._elSparkline, this.state._incomeHistory);
 
     // Rebuild upgrade cards at most 4×/sec to avoid thrashing the DOM
     const now = Date.now();
     if (!this._lastCardRebuild || now - this._lastCardRebuild > 250) {
       this._lastCardRebuild = now;
       this._renderUpgradeCards();
+    }
+  }
+
+  _updateComboMeter() {
+    if (!this._elComboFill) return;
+    const now = Date.now();
+    const hits = (this.state.comboHits || []).filter(t => now - t < 3000).length;
+
+    let tierIdx = 0;
+    for (let i = 0; i < COMBO_THRESHOLDS.length; i++) {
+      if (hits >= COMBO_THRESHOLDS[i].min) tierIdx = i;
+    }
+    const tier = COMBO_THRESHOLDS[tierIdx];
+
+    this._elComboMult.textContent = 'x' + tier.mult.toFixed(1);
+    this._elComboFill.style.backgroundColor = tier.color;
+    if (tier.next !== null) {
+      const progress = Math.min(1, (hits - tier.min) / (tier.next - tier.min));
+      this._elComboFill.style.width = (progress * 100).toFixed(1) + '%';
+      const nextMult = COMBO_THRESHOLDS[tierIdx + 1].mult.toFixed(1);
+      this._elComboHint.textContent = (tier.next - hits) + ' more hits for x' + nextMult + '!';
+    } else {
+      this._elComboFill.style.width = '100%';
+      this._elComboHint.textContent = 'MAX COMBO!';
     }
   }
 
@@ -474,6 +569,32 @@ class Game {
     document.getElementById('btn-clear-save').addEventListener('click', () => {
       if (confirm('Delete all save data and restart?')) { clearSave(); location.reload(); }
     });
+
+    // Settings panel
+    const settingsPanel = document.getElementById('settings-panel');
+    const btnSettings = document.getElementById('btn-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    if (btnSettings && settingsPanel) {
+      btnSettings.addEventListener('click', () => { settingsPanel.style.display = ''; });
+      settingsPanel.addEventListener('click', e => {
+        if (e.target === settingsPanel) settingsPanel.style.display = 'none';
+      });
+    }
+    if (btnCloseSettings && settingsPanel) {
+      btnCloseSettings.addEventListener('click', () => { settingsPanel.style.display = 'none'; });
+    }
+    const settingMute = document.getElementById('setting-mute');
+    if (settingMute) {
+      settingMute.addEventListener('change', () => { window._gameMuted = settingMute.checked; });
+    }
+    const settingParticles = document.getElementById('setting-particles');
+    if (settingParticles) {
+      settingParticles.addEventListener('change', () => { this.state._particlesEnabled = settingParticles.checked; });
+    }
+    const settingShake = document.getElementById('setting-shake');
+    if (settingShake) {
+      settingShake.addEventListener('change', () => { this.state._shakeEnabled = settingShake.checked; });
+    }
   }
 
   _loop(timestamp) {
