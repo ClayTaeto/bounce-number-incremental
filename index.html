@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bouncing Numbers</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a10;
+      color: #ddd;
+      font-family: 'Courier New', Courier, monospace;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* ── TOP BAR ── */
+    #top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: #111118;
+      border-bottom: 1px solid #222235;
+      height: 52px;
+      flex-shrink: 0;
+    }
+    #money-display {
+      font-size: 26px;
+      font-weight: bold;
+      color: #ffd700;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+      min-width: 160px;
+    }
+    .top-stat { font-size: 13px; color: #888; }
+    .top-stat span { color: #ccc; font-weight: bold; }
+
+    /* ── MAIN AREA ── */
+    #main-area {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── LEFT PANEL ── */
+    #left-panel {
+      width: 188px;
+      flex-shrink: 0;
+      background: #0e0e18;
+      border-right: 1px solid #222235;
+      padding: 10px 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    #left-panel h3 {
+      color: #5566cc;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #222235;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 1px 0;
+    }
+    .stat-row .stat-label { color: #666; }
+    .stat-row .stat-val   { color: #ccc; font-weight: bold; }
+    .panel-divider { border: none; border-top: 1px solid #222235; margin: 6px 0; }
+    .hint-text { font-size: 10px; color: #444; line-height: 1.5; margin-top: 6px; }
+
+    /* ── ARENA ── */
+    #arena-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0a0a10;
+    }
+    #arena { display: block; width: 100%; height: 100%; }
+
+    #prestige-notification {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(40, 20, 80, 0.96);
+      border: 2px solid #8855cc;
+      border-radius: 10px;
+      padding: 18px 28px;
+      text-align: center;
+      z-index: 20;
+      animation: popIn 0.25s ease;
+      pointer-events: none;
+    }
+    .pn-title { font-size: 22px; font-weight: bold; color: #cc88ff; }
+    .pn-sub   { font-size: 13px; color: #aaa; margin-top: 4px; }
+    @keyframes popIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* ── RIGHT PANEL ── */
+    #right-panel {
+      width: 252px;
+      flex-shrink: 0;
+      background: #0e0e18;
+      border-left: 1px solid #222235;
+      display: flex;
+      flex-direction: column;
+    }
+    #upgrade-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      padding: 6px;
+      background: #111118;
+      border-bottom: 1px solid #222235;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 44px;
+      padding: 4px 4px;
+      background: #18182a;
+      border: 1px solid #2a2a40;
+      border-radius: 3px;
+      color: #777;
+      font-size: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s, color 0.1s;
+    }
+    .tab-btn:hover { background: #202035; color: #bbb; }
+    .tab-btn.active { background: #252545; color: #8899ff; border-color: #4455aa; }
+
+    #upgrade-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .upgrade-card {
+      background: #111120;
+      border: 1px solid #222235;
+      border-radius: 5px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .upgrade-card:hover:not(.maxed) { background: #181828; border-color: #3344aa; }
+    .upgrade-card.affordable         { border-color: #2a5a2a; }
+    .upgrade-card.affordable:hover   { background: #161e16; border-color: #44aa44; }
+    .upgrade-card.maxed              { opacity: 0.55; cursor: default; border-color: #5a5a20; }
+    .upgrade-card.lf-card            { border-color: #1a3a44; }
+    .upgrade-card.lf-card.affordable { border-color: #1a6a7a; }
+
+    .upg-header { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+    .upg-name   { font-size: 12px; color: #ddd; font-weight: bold; flex: 1; }
+    .upg-level  { font-size: 10px; color: #555; font-weight: normal; margin-left: auto; }
+    .upg-tab-badge { font-size: 9px; color: #555; background: #1a1a2e; border: 1px solid #333; border-radius: 3px; padding: 0 4px; }
+    .upg-desc   { font-size: 10px; color: #666; margin: 2px 0 1px; }
+    .upg-effect { font-size: 11px; color: #6688ff; }
+    .upg-cost   { font-size: 11px; color: #ffd700; text-align: right; margin-top: 2px; }
+    .lf-card .upg-cost { color: #00e5ff; }
+
+    /* ── BOTTOM BAR ── */
+    #bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 8px 16px;
+      background: #111118;
+      border-top: 1px solid #222235;
+      height: 88px;
+      flex-shrink: 0;
+    }
+
+    .game-btn {
+      width: 196px;
+      height: 68px;
+      background: #14223a;
+      border: 2px solid #2244aa;
+      border-radius: 8px;
+      color: #88aaff;
+      font-family: inherit;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s, border-color 0.1s, transform 0.06s;
+      touch-action: none;
+    }
+    .game-btn:hover:not(:disabled)  { background: #1a2e50; border-color: #3355cc; }
+    .game-btn:active:not(:disabled) { transform: scale(0.96); background: #101c30; }
+    .game-btn:disabled              { opacity: 0.45; cursor: default; }
+    .game-btn.arena-full            { border-color: #884422; color: #ffaa66; background: #1e0e00; }
+    .btn-sub { font-size: 12px; color: #ffd700; font-weight: normal; margin-top: 2px; }
+    .game-btn.arena-full .btn-sub { color: #ff7744; }
+
+    #btn-prestige {
+      display: none;
+      width: 136px;
+      height: 68px;
+      background: #1e1040;
+      border: 2px solid #7744cc;
+      border-radius: 8px;
+      color: #bb88ff;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    #btn-prestige:hover { background: #281555; border-color: #aa66ff; }
+
+    #btn-clear-save {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: none;
+      border: 1px solid #333;
+      color: #444;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #btn-clear-save:hover { color: #888; border-color: #555; }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0a0a10; }
+    ::-webkit-scrollbar-thumb { background: #252535; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <div id="top-bar">
+    <div id="money-display">$0</div>
+    <div class="top-stat">Income: <span id="income-display">$0/s</span></div>
+    <div class="top-stat">Best: <span id="highest-display">1</span></div>
+    <div class="top-stat">⚡ Frags: <span id="frags-display">0</span></div>
+    <div class="top-stat">Prestige: <span id="prestige-display">0</span></div>
+  </div>
+
+  <div id="main-area">
+    <!-- LEFT: stats -->
+    <div id="left-panel">
+      <h3>Stats</h3>
+      <div class="stat-row"><span class="stat-label">Numbers</span><span class="stat-val" id="stat-numbers">0/20</span></div>
+      <div class="stat-row"><span class="stat-label">Combo</span><span class="stat-val" id="stat-combo">x1.0</span></div>
+      <div class="stat-row"><span class="stat-label">Wall Hits</span><span class="stat-val" id="stat-hits">0</span></div>
+      <div class="stat-row"><span class="stat-label">Crit %</span><span class="stat-val" id="stat-crit">0%</span></div>
+      <div class="stat-row"><span class="stat-label">Speed</span><span class="stat-val" id="stat-speed">180</span></div>
+      <div class="stat-row"><span class="stat-label">LS Cap</span><span class="stat-val" id="stat-ls">500</span></div>
+      <hr class="panel-divider">
+      <div class="stat-row"><span class="stat-label">Lifetime</span><span class="stat-val" id="stat-lifetime">$0</span></div>
+      <div class="stat-row"><span class="stat-label">Shards</span><span class="stat-val" id="stat-shards">0</span></div>
+      <div class="hint-text">
+        [A] Add 1<br>
+        [M] Merge<br>
+        Hold to rapid-fire
+      </div>
+    </div>
+
+    <!-- CENTER: arena canvas -->
+    <div id="arena-container">
+      <canvas id="arena"></canvas>
+      <div id="prestige-notification">
+        <div class="pn-title">✦ Arena Full!</div>
+        <div class="pn-sub">Prestige is now available</div>
+      </div>
+      <button id="btn-clear-save">reset save</button>
+    </div>
+
+    <!-- RIGHT: upgrades -->
+    <div id="right-panel">
+      <div id="upgrade-tabs"></div>
+      <div id="upgrade-content"></div>
+    </div>
+  </div>
+
+  <div id="bottom-bar">
+    <button class="game-btn" id="btn-add">
+      Add 1
+      <span class="btn-sub" id="add-cost-display">$5</span>
+    </button>
+    <button class="game-btn" id="btn-merge">
+      Merge
+      <span class="btn-sub" id="merge-pairs-display">0 pairs</span>
+    </button>
+    <button id="btn-prestige">✦ Prestige</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/decimal.js@10/decimal.min.js"></script>
+  <script src="src/constants.js"></script>
+  <script src="src/upgrades.js"></script>
+  <script src="src/save.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/game.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      window.game = new Game();
+    });
+  </script>
+</body>
+</html>
