@@ -24,6 +24,11 @@ class Game {
       this._spawnBall(0);
     }
 
+    if (loaded && this.state._offlineEarnings && this.state._offlineEarnings.gt(0)) {
+      this._showOfflinePopup(this.state._offlineEarnings, this.state._offlineTime);
+      this.state._offlineEarnings = null;
+    }
+
     this._buildUpgradeTabs();
     this._renderUpgradeCards();
     this._bindInput();
@@ -50,6 +55,8 @@ class Game {
       incomePerSec: new Decimal(0),
       _particles: [],
       _popups: [],
+      _offlineEarnings: null,
+      _offlineTime: 0,
     };
   }
 
@@ -408,6 +415,23 @@ class Game {
     const c = {};
     for (const b of this.state.balls) c[b.tier] = (c[b.tier] || 0) + 1;
     return Object.values(c).reduce((s, n) => s + Math.floor(n / 2), 0);
+  }
+
+  _showOfflinePopup(earned, seconds) {
+    const popup = document.getElementById('offline-popup');
+    if (!popup) return;
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+    document.getElementById('offline-time').textContent = timeStr;
+    document.getElementById('offline-earned').textContent = '$' + formatMoney(earned);
+    popup.style.display = 'flex';
+
+    document.getElementById('offline-close').addEventListener('click', () => {
+      popup.style.display = 'none';
+    }, { once: true });
   }
 
   _buildUpgradeTabs() { buildUpgradeTabs(this); }

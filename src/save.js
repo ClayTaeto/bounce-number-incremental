@@ -34,6 +34,7 @@ function saveGame(state, arenaW, arenaH) {
         vy: Math.round(b.vy / ((arenaH || REFERENCE_WIDTH * 0.6) / (REFERENCE_WIDTH * 0.6))),
       })),
       savedAt: Date.now(),
+      lastIncomePerSec: state.incomePerSec.toString(),
     };
     const content = JSON.stringify(data);
     data.checksum = _hash(content);
@@ -63,6 +64,25 @@ function loadSave(state, arenaW, arenaH) {
     state.highestTier = data.highestTier || 0;
     state.wallHits = data.wallHits || 0;
     state.prestigeAvailable = data.prestigeAvailable || false;
+
+    // Calculate offline earnings
+    const now = Date.now();
+    const savedAt = data.savedAt || now;
+    const elapsedMs = now - savedAt;
+    const elapsedSec = Math.min(elapsedMs / 1000, 8 * 3600); // cap at 8 hours
+
+    if (elapsedSec > 60) { // only if away for more than 1 minute
+      const lastIncome = new Decimal(data.lastIncomePerSec || 0);
+      if (lastIncome.gt(0)) {
+        const hasAutoPrinter = (data.upgrades && data.upgrades.autoPrinter > 0);
+        const efficiency = hasAutoPrinter ? 0.5 : 0.15;
+        const earned = lastIncome.mul(elapsedSec).mul(efficiency);
+        state.money = state.money.add(earned);
+        state.lifetimeMoney = state.lifetimeMoney.add(earned);
+        state._offlineEarnings = earned;
+        state._offlineTime = elapsedSec;
+      }
+    }
 
     const scaleX = arenaW / REFERENCE_WIDTH;
     const scaleY = arenaH / (REFERENCE_WIDTH * 0.6);
