@@ -202,13 +202,19 @@ function renderUpgradeCards(game) {
     return;
   }
 
-  // Build an id→card map of what's currently rendered
+  // Build id→card map of what's currently in the DOM
   const existing = {};
   for (const el of content.querySelectorAll('.upgrade-card[data-upg-id]')) {
     existing[el.dataset.upgId] = el;
   }
 
-  const fragment = document.createDocumentFragment();
+  const visibleIds = visible.map(u => u.id).join(',');
+  const listChanged = visibleIds !== Object.keys(existing).join(',');
+
+  // If the set/order changed, wipe and rebuild from scratch
+  if (listChanged) {
+    content.innerHTML = '';
+  }
 
   visible.forEach(upg => {
     const level = getUpgradeLevel(upg, game.state);
@@ -228,18 +234,21 @@ function renderUpgradeCards(game) {
 
     const costText = maxed ? '✓ MAX' : (isLF ? '⚡' : isShard ? '◆' : isInf ? '∞' : '$') + formatMoney(cost);
     const effectText = upg.effect(level);
-    const tabBadge = game._currentTab === 'All'
-      ? `<span class="upg-tab-badge">${upg.tab}</span>`
-      : '';
     const levelText = `Lv ${level}/${upg.maxLevel}`;
 
-    let card = existing[upg.id];
+    const card = existing[upg.id];
 
     if (!card) {
-      // First time seeing this upgrade — create the card
-      card = document.createElement('div');
-      card.dataset.upgId = upg.id;
-      card.innerHTML = `
+      // New card — build and append
+      const el = document.createElement('div');
+      el.dataset.upgId = upg.id;
+      el.className = newClass;
+
+      const tabBadge = game._currentTab === 'All'
+        ? `<span class="upg-tab-badge">${upg.tab}</span>`
+        : '';
+
+      el.innerHTML = `
         <div class="upg-header">
           <span class="upg-name">${upg.name}</span>
           ${tabBadge}
@@ -251,45 +260,36 @@ function renderUpgradeCards(game) {
       `;
 
       if (!maxed) {
-        let holdTimer = null;
-        let holdInterval = null;
-
+        let holdTimer = null, holdInterval = null;
         function tryBuy() {
           if (purchaseUpgrade(upg, game.state)) game.onUpgradePurchased(upg);
         }
-
-        card.addEventListener('mousedown', e => {
+        el.addEventListener('mousedown', e => {
           if (e.button !== 0) return;
           tryBuy();
           holdTimer = setTimeout(() => { holdInterval = setInterval(tryBuy, 80); }, 400);
         });
-        card.addEventListener('mouseup',    () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-        card.addEventListener('mouseleave', () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-        card.addEventListener('touchstart', e => {
+        el.addEventListener('mouseup',    () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        el.addEventListener('mouseleave', () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        el.addEventListener('touchstart', e => {
           e.preventDefault();
           tryBuy();
           holdTimer = setTimeout(() => { holdInterval = setInterval(tryBuy, 80); }, 400);
         }, { passive: false });
-        card.addEventListener('touchend',   () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
-        card.addEventListener('touchcancel',() => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        el.addEventListener('touchend',   () => { clearTimeout(holdTimer); clearInterval(holdInterval); });
+        el.addEventListener('touchcancel',() => { clearTimeout(holdTimer); clearInterval(holdInterval); });
       }
+
+      content.appendChild(el);
     } else {
-      // Card exists — only patch the parts that change
-      card.querySelector('.upg-level').textContent = levelText;
-      card.querySelector('.upg-effect').textContent = effectText;
-      card.querySelector('.upg-cost').textContent = costText;
+      // Existing card — patch only what can change, leave DOM node untouched otherwise
+      if (card.className !== newClass) card.className = newClass;
+      const lvEl = card.querySelector('.upg-level');
+      const efEl = card.querySelector('.upg-effect');
+      const coEl = card.querySelector('.upg-cost');
+      if (lvEl && lvEl.textContent !== levelText)   lvEl.textContent = levelText;
+      if (efEl && efEl.textContent !== effectText)  efEl.textContent = effectText;
+      if (coEl && coEl.textContent !== costText)    coEl.textContent = costText;
     }
-
-    // Always sync className (affordable/maxed can change every tick)
-    card.className = newClass;
-    fragment.appendChild(card);
   });
-
-  // Replace content only if the set of visible upgrades changed, otherwise just reorder in-place
-  const renderedIds = [...content.querySelectorAll('.upgrade-card[data-upg-id]')].map(el => el.dataset.upgId).join(',');
-  const visibleIds = visible.map(u => u.id).join(',');
-  if (renderedIds !== visibleIds) {
-    content.innerHTML = '';
-    content.appendChild(fragment);
-  }
 }
