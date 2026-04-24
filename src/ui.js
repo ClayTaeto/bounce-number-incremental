@@ -1,3 +1,21 @@
+function gameConfirm(message, onConfirm) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-text').textContent = message;
+  modal.style.display = 'flex';
+
+  const ok = document.getElementById('confirm-ok');
+  const cancel = document.getElementById('confirm-cancel');
+
+  function cleanup() {
+    modal.style.display = 'none';
+    ok.replaceWith(ok.cloneNode(true));
+    cancel.replaceWith(cancel.cloneNode(true));
+  }
+
+  document.getElementById('confirm-ok').addEventListener('click', () => { cleanup(); onConfirm(); }, { once: true });
+  document.getElementById('confirm-cancel').addEventListener('click', () => { cleanup(); }, { once: true });
+}
+
 function drawSparkline(canvas, history) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;

@@ -1015,17 +1015,15 @@ class Game {
     });
 
     document.getElementById('btn-prestige').addEventListener('click', () => {
-      if (this.state.prestigeAvailable && confirm('Prestige? Your numbers and money reset, but you keep Light Fragments and earn Prime Shards.')) {
-        this.prestige();
-      }
+      if (!this.state.prestigeAvailable) return;
+      gameConfirm('Prestige? Your numbers and money reset, but you keep Light Fragments and earn Prime Shards.', () => this.prestige());
     });
 
     const biBtn = document.getElementById('btn-break-infinity');
     if (biBtn) {
       biBtn.addEventListener('click', () => {
-        if (this.state.prestige >= 10 && confirm('Break Infinity? All prestige progress resets, but you keep Light Fragments, permanent upgrades, and earn Infinity Points.')) {
-          this.breakInfinity();
-        }
+        if (this.state.prestige < 10) return;
+        gameConfirm('Break Infinity? All prestige progress resets, but you keep Light Fragments, permanent upgrades, and earn Infinity Points.', () => this.breakInfinity());
       });
     }
 
@@ -1050,7 +1048,7 @@ class Game {
     });
 
     document.getElementById('btn-clear-save').addEventListener('click', () => {
-      if (confirm('Delete all save data and restart?')) { clearSave(); location.reload(); }
+      gameConfirm('Delete all save data and restart?', () => { clearSave(); location.reload(); });
     });
 
     const skipBtn = document.getElementById('tutorial-skip');
