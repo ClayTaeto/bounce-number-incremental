@@ -885,10 +885,10 @@ class Game {
     const pairs = this._countPairs();
     document.getElementById('merge-pairs-display').textContent = pairs + (pairs === 1 ? ' pair' : ' pairs');
     const prestigeBtn = document.getElementById('btn-prestige');
-    prestigeBtn.style.display = this.state.prestigeAvailable ? '' : 'none';
+    prestigeBtn.style.display = this.state.prestigeAvailable ? 'block' : 'none';
     prestigeBtn.classList.toggle('prestige-available', this.state.prestigeAvailable);
     const prestigeHint = document.getElementById('prestige-hint');
-    if (prestigeHint) prestigeHint.style.display = this.state.prestigeAvailable ? '' : 'none';
+    if (prestigeHint) prestigeHint.style.display = this.state.prestigeAvailable ? 'block' : 'none';
     const biBtn = document.getElementById('btn-break-infinity');
     if (biBtn) biBtn.style.display = this.state.prestige >= 10 ? '' : 'none';
 
