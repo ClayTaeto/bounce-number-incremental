@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bouncing Numbers MVP</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Bouncing Numbers</h1>
+      <div class="stats">
+        <div><span>Money</span><strong id="money">$0</strong></div>
+        <div><span>Light Fragments</span><strong id="fragments">0</strong></div>
+        <div><span>Combo</span><strong id="combo">x1.00</strong></div>
+        <div><span>Capacity</span><strong id="capacity">0/20</strong></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="arena-panel">
+        <canvas id="arena" width="960" height="540" aria-label="game arena"></canvas>
+        <div id="toast" class="toast" aria-live="polite"></div>
+      </section>
+
+      <aside class="controls">
+        <button id="addBtn" class="action">Add 1 <small id="addCost">$5</small></button>
+        <button id="mergeBtn" class="action">Merge</button>
+        <button id="prestigeBtn" class="action prestige" disabled>Prestige (Arena Full)</button>
+
+        <div class="upgrades">
+          <h2>Upgrades</h2>
+          <button class="upgrade" data-upgrade="addRate">Quick Fingers (+add rate)</button>
+          <button class="upgrade" data-upgrade="mergeRate">Merge Engine (+merge rate)</button>
+          <button class="upgrade" data-upgrade="wallMult">Wall Coating (+wall payout)</button>
+          <button class="upgrade" data-upgrade="speedMult">Aerodynamics (+speed payout)</button>
+          <button class="upgrade" data-upgrade="capacity">Bigger Arena (+5 cap)</button>
+          <button class="upgrade" data-upgrade="lightspeed">Stabilizer (+lightspeed threshold)</button>
+        </div>
+
+        <div class="help">
+          <h2>How to play</h2>
+          <ul>
+            <li>Numbers bounce and earn money on left/right wall hits.</li>
+            <li>Hold <strong>Add 1</strong> to feed the arena.</li>
+            <li>Hold <strong>Merge</strong> to combine equal values.</li>
+            <li>When a number exceeds lightspeed it converts into Light Fragments.</li>
+            <li>Fill arena capacity to unlock prestige.</li>
+          </ul>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
