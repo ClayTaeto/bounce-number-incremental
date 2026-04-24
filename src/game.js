@@ -95,6 +95,10 @@ class Game {
       _shakeIntensity: 0,
       _particlesEnabled: true,
       _shakeEnabled: true,
+      _holdBoostEnd: 0,
+      _mergeComboCount: 0,
+      _mergeComboWindow: 0,
+      _wallHitHistory: [],
     };
   }
 
@@ -129,6 +133,28 @@ class Game {
     return (BASE_SPEED + (this.state.upgrades.speedUp || 0) * 20) * this._speedScale();
   }
 
+  getBallTargetSpeed(ball) {
+    const base = this.getBaseSpeed();
+    if (!ball || !ball.trait) return base;
+    if (ball.trait === 'hot')   return base * 1.25;
+    if (ball.trait === 'heavy') return base * 0.7;
+    return base;
+  }
+
+  _pickInheritedTrait(parents) {
+    const traitParents = parents.filter(p => p.trait);
+    if (!traitParents.length) return null;
+    return traitParents[Math.floor(Math.random() * traitParents.length)].trait;
+  }
+
+  _emitMergeParticles(nx, ny, count, speed, tier) {
+    const color = getTierInfo(tier).color;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      this.state._particles.push({ x: nx, y: ny, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 0.5 + speed / 300, size: 3, color });
+    }
+  }
+
   getLightspeedThreshold() {
     return (LIGHTSPEED_BASE + (this.state.permanentUpgrades.lsBuffer || 0) * 50) * this._speedScale();
   }
@@ -147,19 +173,26 @@ class Game {
   _spawnBall(tier, forceX, forceY) {
     const w = this.canvas.width, h = this.canvas.height;
     const r = getBallRadius(tier);
-    const speed = this.getBaseSpeed();
     const angle = Math.random() * Math.PI * 2;
+    const traitChanceLevel = this.state.upgrades.traitChance || 0;
+    let trait = null;
+    if (traitChanceLevel > 0 && Math.random() < traitChanceLevel * 0.05) {
+      const traits = ['golden', 'hot', 'lucky', 'heavy'];
+      trait = traits[Math.floor(Math.random() * traits.length)];
+    }
     const ball = {
       id: this._ballId++,
       tier,
+      trait,
       x: forceX !== undefined ? forceX : r * 2 + Math.random() * (w - r * 4),
       y: forceY !== undefined ? forceY : r * 2 + Math.random() * (h - r * 4),
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
       radius: r,
       hitFlash: 0, mergeFlash: 0, popScale: 1,
       _lastHitTime: 0, _stuckTimer: 0, _remove: false,
     };
+    const speed = this.getBallTargetSpeed(ball);
+    ball.vx = Math.cos(angle) * speed;
+    ball.vy = Math.sin(angle) * speed;
     this.state.balls.push(ball);
     return ball;
   }
@@ -171,7 +204,10 @@ class Game {
     if (!this.state.money.gte(cost)) return false;
     this.state.money = this.state.money.sub(cost);
     this.state.numbersAdded++;
+    if (this.state.upgrades.holdBoost) this.state._holdBoostEnd = Date.now() + 3000;
     this._spawnBall(0);
+    const bulkLevel = this.state.upgrades.bulkAdder || 0;
+    for (let i = 0; i < bulkLevel && this.state.balls.length < cap; i++) this._spawnBall(0);
     if (this.state.balls.length >= cap && !this.state.prestigeAvailable) {
       this.state.prestigeAvailable = true;
       document.getElementById('prestige-notification').style.display = 'block';
@@ -188,6 +224,16 @@ class Game {
       if (!counts[b.tier]) counts[b.tier] = [];
       counts[b.tier].push(b);
     }
+    const megaLevel = this.state.upgrades.megaMerge || 0;
+    // Try mega merge: 4→1 into tier+2
+    if (megaLevel > 0 && Math.random() < megaLevel * 0.05) {
+      for (const tier of Object.keys(counts).map(Number).sort((a, b) => a - b)) {
+        if (counts[tier].length >= 4) {
+          this._megaMergeBalls(counts[tier][0], counts[tier][1], counts[tier][2], counts[tier][3]);
+          return true;
+        }
+      }
+    }
     for (const tier of Object.keys(counts).map(Number).sort((a, b) => a - b)) {
       if (counts[tier].length >= 2) {
         this._mergeBalls(counts[tier][0], counts[tier][1]);
@@ -195,6 +241,24 @@ class Game {
       }
     }
     return false;
+  }
+
+  _megaMergeBalls(a, b, c, d) {
+    const newTier = a.tier + 2;
+    const nx = (a.x + b.x + c.x + d.x) / 4;
+    const ny = (a.y + b.y + c.y + d.y) / 4;
+    const angle = Math.random() * Math.PI * 2;
+    const pop = 100;
+    const nvx = (a.vx + b.vx + c.vx + d.vx) / 4 + Math.cos(angle) * pop;
+    const nvy = (a.vy + b.vy + c.vy + d.vy) / 4 + Math.sin(angle) * pop;
+    a._remove = b._remove = c._remove = d._remove = true;
+    this.state.balls = this.state.balls.filter(x => !x._remove);
+    this.state.balls.push({ id: this._ballId++, tier: newTier, trait: this._pickInheritedTrait([a, b, c, d]),
+      x: nx, y: ny, vx: nvx, vy: nvy,
+      radius: getBallRadius(newTier), hitFlash: 0, mergeFlash: 0.5, popScale: 1.6,
+      _lastHitTime: 0, _stuckTimer: 0, _remove: false });
+    if (newTier > this.state.highestTier) this.state.highestTier = newTier;
+    this._emitMergeParticles(nx, ny, 12, 110, newTier);
   }
 
   _mergeBalls(a, b) {
@@ -210,29 +274,59 @@ class Game {
     a._remove = b._remove = true;
     this.state.balls = this.state.balls.filter(x => !x._remove);
 
-    this.state.balls.push({ id: this._ballId++, tier: newTier, x: nx, y: ny, vx: nvx, vy: nvy,
+    this.state.balls.push({ id: this._ballId++, tier: newTier, trait: this._pickInheritedTrait([a, b]),
+      x: nx, y: ny, vx: nvx, vy: nvy,
       radius: getBallRadius(newTier), hitFlash: 0, mergeFlash: 0.35, popScale: 1.45,
       _lastHitTime: 0, _stuckTimer: 0, _remove: false });
     if (newTier > this.state.highestTier) this.state.highestTier = newTier;
+
+    const mergeComboLevel = this.state.upgrades.mergeCombo || 0;
+    const now = Date.now();
+    if (now - this.state._mergeComboWindow > 3000) this.state._mergeComboCount = 0;
+    this.state._mergeComboCount++;
+    this.state._mergeComboWindow = now;
+    const mergeComboMult = mergeComboLevel > 0 ? 1 + mergeComboLevel * 0.1 * (this.state._mergeComboCount - 1) : 1;
+
     const mergePayLevel = this.state.upgrades.mergePayout || 0;
     if (mergePayLevel > 0) {
-      const bonus = new Decimal(2).pow(newTier).mul(mergePayLevel * 0.1);
+      const bonus = new Decimal(2).pow(newTier).mul(mergePayLevel * 0.1).mul(mergeComboMult);
       this.state.money = this.state.money.add(bonus);
       this.state.lifetimeMoney = this.state.lifetimeMoney.add(bonus);
     }
 
-    const pc = getTierInfo(newTier).color;
-    for (let i = 0; i < 8; i++) {
-      const pa = (i / 8) * Math.PI * 2;
-      this.state._particles.push({ x: nx, y: ny, vx: Math.cos(pa) * 90, vy: Math.sin(pa) * 90, life: 0.5, size: 3, color: pc });
+    const splitLevel = this.state.upgrades.splitMerge || 0;
+    if (splitLevel > 0 && newTier >= 10 && Math.random() < splitLevel * 0.25) {
+      if (this.state.balls.length < this.getCapacity()) this._spawnBall(0, nx, ny);
     }
+
+    this._emitMergeParticles(nx, ny, 8, 90, newTier);
   }
 
   _triggerLightspeed(ball) {
     if (window.audio) window.audio.playLightspeed();
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
     ball._remove = true;
     const frags = Math.ceil(Math.max(1, ball.tier / 2) * (1 + (this.state.permanentUpgrades.fragBoost || 0) * 0.25));
     this.state.lightFragments = this.state.lightFragments.add(frags);
+
+    const scLevel = this.state.permanentUpgrades.speedConverter || 0;
+    if (scLevel > 0) {
+      const bonus = new Decimal(Math.floor(speed * 0.1 * scLevel));
+      this.state.money = this.state.money.add(bonus);
+      this.state.lifetimeMoney = this.state.lifetimeMoney.add(bonus);
+    }
+
+    const lsBonusLevel = this.state.permanentUpgrades.lsBonus || 0;
+    if (lsBonusLevel > 0) {
+      const boost = 1 + lsBonusLevel * 0.1;
+      for (const b of this.state.balls) {
+        if (!b._remove) {
+          b.vx *= boost;
+          b.vy *= boost;
+        }
+      }
+    }
+
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       this.state._particles.push({ x: ball.x, y: ball.y, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140, life: 0.9, size: 4, color: '#ffffff' });
@@ -243,30 +337,54 @@ class Game {
   _updatePhysics(dt) {
     const w = this.canvas.width, h = this.canvas.height;
     const threshold = this.getLightspeedThreshold();
+    const magnetLevel = this.state.upgrades.ballMagnet || 0;
+    const speedRampLevel = this.state.upgrades.speedRamp || 0;
+    const elasticLevel = this.state.upgrades.elasticBounce || 0;
 
     for (const ball of this.state.balls) {
       if (ball._remove) continue;
       if (ball.popScale > 1) ball.popScale = Math.max(1, ball.popScale - dt * 6);
 
-      // Update trail for high-tier balls (tier >= 6)
+      let curSpd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+
       if (ball.tier >= 6) {
         if (!ball._trail) ball._trail = [];
         const last = ball._trail[ball._trail.length - 1];
-        const dx = ball.x - (last ? last.x : ball.x);
-        const dy = ball.y - (last ? last.y : ball.y);
-        if (!last || Math.sqrt(dx * dx + dy * dy) > ball.radius) {
+        const tdx = ball.x - (last ? last.x : ball.x);
+        const tdy = ball.y - (last ? last.y : ball.y);
+        if (!last || Math.sqrt(tdx * tdx + tdy * tdy) > ball.radius) {
           ball._trail.push({ x: ball.x, y: ball.y });
           if (ball._trail.length > 3) ball._trail.shift();
+        }
+      }
+
+      if (speedRampLevel > 0) {
+        const targetSpd = this.getBallTargetSpeed(ball) * (1 + speedRampLevel * 0.1);
+        if (curSpd > 0 && curSpd < targetSpd) {
+          const scale = Math.min(1 + 0.001 * speedRampLevel * dt * 60, targetSpd / curSpd);
+          ball.vx *= scale;
+          ball.vy *= scale;
+          curSpd *= scale;
+        }
+      }
+
+      if (magnetLevel > 0) {
+        if (curSpd < this.getBallTargetSpeed(ball) * 0.6) {
+          const dx = w / 2 - ball.x;
+          const dy = h / 2 - ball.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = magnetLevel * 30 * dt;
+          ball.vx += (dx / dist) * force;
+          ball.vy += (dy / dist) * force;
         }
       }
 
       ball.x += ball.vx * dt;
       ball.y += ball.vy * dt;
 
-      const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      const spd = curSpd;
       if (spd >= threshold) { this._triggerLightspeed(ball); continue; }
 
-      // Near-lightspeed particles
       if (this.state._particlesEnabled !== false && spd / threshold > 0.85 && Math.random() < 0.3) {
         this.state._particles.push({
           x: ball.x, y: ball.y,
@@ -275,12 +393,12 @@ class Game {
         });
       }
 
-      // Anti-stuck nudge
+
       if (spd < 25) {
         ball._stuckTimer += dt;
         if (ball._stuckTimer > 1.5) {
           const a = Math.random() * Math.PI * 2;
-          const s = this.getBaseSpeed();
+          const s = this.getBallTargetSpeed(ball);
           ball.vx = Math.cos(a) * s; ball.vy = Math.sin(a) * s;
           ball._stuckTimer = 0;
         }
@@ -295,10 +413,18 @@ class Game {
       else if (ball.y + r > h) { ball.y = h - r; ball.vy = -Math.abs(ball.vy); hitWall = hitWall || 'bottom'; }
 
       if (hitWall) {
+        if (elasticLevel > 0) {
+          const boostFactor = 1 + elasticLevel * 0.05;
+          const newSpd = spd * boostFactor;
+          if (newSpd < threshold * 0.95) {
+            ball.vx *= boostFactor;
+            ball.vy *= boostFactor;
+          }
+        }
         const now = performance.now();
         if (now - ball._lastHitTime > 80) {
           ball._lastHitTime = now;
-          this._onWallHit(ball, hitWall, spd);
+          this._onWallHit(ball, hitWall, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy));
           ball.hitFlash = 0.15;
         }
       }
@@ -309,8 +435,16 @@ class Game {
   }
 
   _onWallHit(ball, wall, speed) {
-    const wallMult = this.getWallMult(wall);
-    if (wallMult === 0) return;
+    let wallMult = this.getWallMult(wall);
+    if (wallMult === 0) {
+      const wallSynergyLevel = this.state.upgrades.wallSynergy || 0;
+      if (wallSynergyLevel > 0 && (wall === 'top' || wall === 'bottom')) {
+        const lBonus = (this.state.upgrades.leftWall  || 0) * 0.5;
+        const rBonus = (this.state.upgrades.rightWall || 0) * 0.5;
+        wallMult = 1 + (lBonus + rBonus) * 0.5 * 0.5;
+      }
+      if (wallMult === 0) return;
+    }
 
     const threshold = this.getLightspeedThreshold();
     const sr = Math.min(speed / threshold, 1);
@@ -331,9 +465,41 @@ class Game {
     this.state.comboHits.push(now);
 
     const critLevel = this.state.upgrades.critChance || 0;
+    const critChance = critLevel * 0.05 + (ball.trait === 'lucky' ? 0.1 : 0);
     let critMult = 1;
-    const isCrit = critLevel > 0 && Math.random() < critLevel * 0.05;
-    if (isCrit) critMult = 10;
+    const isCrit = critChance > 0 && Math.random() < critChance;
+    if (isCrit) {
+      const critComboLevel = this.state.upgrades.critCombo || 0;
+      critMult = 10 * (critComboLevel > 0 ? comboMult : 1);
+    }
+
+    const holdBoostLevel = this.state.upgrades.holdBoost || 0;
+    const holdBoostMult = (holdBoostLevel > 0 && Date.now() < this.state._holdBoostEnd)
+      ? (1 + holdBoostLevel * 0.05) : 1;
+
+    const massProdLevel = this.state.upgrades.massProduction || 0;
+    const massProdMult = massProdLevel > 0
+      ? Math.pow(1 + 0.01 * massProdLevel, this.state.balls.length) : 1;
+
+    const wallMemoryLevel = this.state.upgrades.wallMemory || 0;
+    let wallMemoryMult = 1;
+    if (wallMemoryLevel > 0) {
+      this.state._wallHitHistory = this.state._wallHitHistory.filter(h => now - h.time < 5000);
+      this.state._wallHitHistory.push({ wall, time: now });
+      const uniqueWalls = new Set(this.state._wallHitHistory.map(h => h.wall)).size; // max 4 walls
+      wallMemoryMult = 1 + wallMemoryLevel * 0.05 * uniqueWalls;
+    }
+
+    const richWallsLevel = this.state.upgrades.richWalls || 0;
+    let richWallsMult = 1;
+    if (richWallsLevel > 0) {
+      const moneyK = this.state.money.div(1000).toNumber();
+      richWallsMult = 1 + Math.min(0.5, moneyK * 0.01 * richWallsLevel);
+    }
+
+    let traitMult = 1;
+    if (ball.trait === 'golden') traitMult = 2;
+    if (ball.trait === 'heavy')  traitMult = 3;
 
     // Screen shake on high-tier crit hits
     if (isCrit && ball.tier >= 8 && this.state._shakeEnabled !== false) {
@@ -341,7 +507,16 @@ class Game {
     }
 
     const value = new Decimal(2).pow(ball.tier);
-    const payout = value.mul(wallMult).mul(speedMult).mul(comboMult).mul(critMult);
+    const payout = value
+      .mul(wallMult)
+      .mul(speedMult)
+      .mul(comboMult)
+      .mul(critMult)
+      .mul(holdBoostMult)
+      .mul(massProdMult)
+      .mul(wallMemoryMult)
+      .mul(richWallsMult)
+      .mul(traitMult);
 
     this.state.money = this.state.money.add(payout);
     this.state.lifetimeMoney = this.state.lifetimeMoney.add(payout);
@@ -452,9 +627,9 @@ class Game {
 
   onUpgradePurchased(upg) {
     if (upg.id === 'speedUp') {
-      const target = this.getBaseSpeed();
       for (const b of this.state.balls) {
         const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        const target = this.getBallTargetSpeed(b);
         if (s > 0) { b.vx = (b.vx / s) * target; b.vy = (b.vy / s) * target; }
       }
     }
@@ -476,6 +651,8 @@ class Game {
     document.getElementById('stat-ls').textContent = LIGHTSPEED_BASE + (this.state.permanentUpgrades.lsBuffer || 0) * 50;
     document.getElementById('stat-lifetime').textContent = '$' + formatMoney(this.state.lifetimeMoney);
     document.getElementById('stat-shards').textContent = this.state.primeShards.toFixed(0);
+    const traitCount = this.state.balls.filter(b => b.trait).length;
+    document.getElementById('stat-traits').textContent = traitCount;
 
     const cost = this._getAddCost();
     const isFull = this.state.balls.length >= this.getCapacity();
