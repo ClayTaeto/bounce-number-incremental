@@ -1,6 +1,7 @@
 function renderArena(ctx, state, game) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
+  const layoutId = state.arenaLayout || 'classic';
 
   ctx.save();
 
@@ -15,11 +16,21 @@ function renderArena(ctx, state, game) {
     if (state._shakeIntensity < 0.1) state._shakeIntensity = 0;
   }
 
-  ctx.fillStyle = '#0a0a10';
+  // Background tint per layout
+  if (layoutId === 'pinball') {
+    ctx.fillStyle = '#080a12';
+  } else if (layoutId === 'hallway') {
+    ctx.fillStyle = '#0a0d0a';
+  } else {
+    ctx.fillStyle = '#0a0a10';
+  }
   ctx.fillRect(0, 0, w, h);
 
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(35, 35, 65, 0.5)';
+  // Subtle grid — color varies by layout
+  let gridColor = 'rgba(35, 35, 65, 0.5)';
+  if (layoutId === 'pinball') gridColor = 'rgba(30, 35, 70, 0.5)';
+  if (layoutId === 'hallway') gridColor = 'rgba(30, 55, 35, 0.5)';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let x = 60; x < w; x += 60) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
@@ -36,86 +47,28 @@ function renderArena(ctx, state, game) {
   for (const ball of state.balls) renderBall(ctx, ball, threshold);
   if (state._popups) renderPopups(ctx, state._popups);
 
+  // Layout name label (top-left, faded)
+  if (typeof ARENA_LAYOUTS !== 'undefined' && ARENA_LAYOUTS[layoutId]) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(ARENA_LAYOUTS[layoutId].name, 6, 6);
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
 function renderWalls(ctx, state, game, w, h) {
-  // Base (no global boost) mults drive glow intensity; full mults drive labels
-  const lm = game.getBaseWallMult('left');
-  const rm = game.getBaseWallMult('right');
-  const tm = game.getBaseWallMult('top');
-  const bm = game.getBaseWallMult('bottom');
-
-  // Active wall multiplier flash color
   const wallActive = state.wallMultiplierActive && Date.now() < state.wallMultiplierEnd;
-  const wallColor = wallActive ? '255, 220, 60' : '80, 160, 255';
+  const lm = game.getWallMult('left');
+  const rm = game.getWallMult('right');
+  const tm = game.getWallMult('top');
+  const bm = game.getWallMult('bottom');
 
-  // Left wall glow
-  const lAlpha = Math.min(0.9, 0.2 + lm * 0.12);
-  const lg = ctx.createLinearGradient(0, 0, 16, 0);
-  lg.addColorStop(0, `rgba(${wallColor}, ${lAlpha})`);
-  lg.addColorStop(1, `rgba(${wallColor}, 0)`);
-  ctx.fillStyle = lg;
-  ctx.fillRect(0, 0, 16, h);
-
-  // Right wall glow
-  const rAlpha = Math.min(0.9, 0.2 + rm * 0.12);
-  const rg = ctx.createLinearGradient(w, 0, w - 16, 0);
-  rg.addColorStop(0, `rgba(${wallColor}, ${rAlpha})`);
-  rg.addColorStop(1, `rgba(${wallColor}, 0)`);
-  ctx.fillStyle = rg;
-  ctx.fillRect(w - 16, 0, 16, h);
-
-  // Top wall glow
-  const tAlpha = Math.min(0.9, 0.15 + tm * 0.1);
-  const tg = ctx.createLinearGradient(0, 0, 0, 14);
-  tg.addColorStop(0, `rgba(${wallColor}, ${tAlpha})`);
-  tg.addColorStop(1, `rgba(${wallColor}, 0)`);
-  ctx.fillStyle = tg;
-  ctx.fillRect(0, 0, w, 14);
-
-  // Bottom wall glow
-  const btAlpha = Math.min(0.9, 0.15 + bm * 0.1);
-  const btg = ctx.createLinearGradient(0, h, 0, h - 14);
-  btg.addColorStop(0, `rgba(${wallColor}, ${btAlpha})`);
-  btg.addColorStop(1, `rgba(${wallColor}, 0)`);
-  ctx.fillStyle = btg;
-  ctx.fillRect(0, h - 14, w, 14);
-
-  // Solid wall lines
-  ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, lAlpha + 0.3)})`;
-  ctx.fillRect(0, 0, 3, h);
-  ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, rAlpha + 0.3)})`;
-  ctx.fillRect(w - 3, 0, 3, h);
-  ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, tAlpha + 0.3)})`;
-  ctx.fillRect(0, 0, w, 3);
-  ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, btAlpha + 0.3)})`;
-  ctx.fillRect(0, h - 3, w, 3);
-
-  // Multiplier labels on left/right walls
-  ctx.font = 'bold 11px monospace';
-  ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
-  ctx.textAlign = 'center';
-  const displayLm = game.getWallMult('left');
-  const displayRm = game.getWallMult('right');
-  ctx.save();
-  ctx.translate(10, h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`x${displayLm.toFixed(1)}`, 0, 0);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(w - 10, h / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.fillText(`x${displayRm.toFixed(1)}`, 0, 0);
-  ctx.restore();
-
-  // Multiplier labels on top/bottom walls (font/fillStyle/textAlign already set above)
-  const displayTm = game.getWallMult('top');
-  const displayBm = game.getWallMult('bottom');
-  if (displayTm > 1) ctx.fillText(`x${displayTm.toFixed(1)}`, w / 2, 12);
-  if (displayBm > 1) ctx.fillText(`x${displayBm.toFixed(1)}`, w / 2, h - 4);
-
-  // Wall multiplier active banner
   if (wallActive) {
     const remaining = ((state.wallMultiplierEnd - Date.now()) / 1000).toFixed(1);
     ctx.fillStyle = 'rgba(255, 220, 60, 0.85)';
@@ -123,72 +76,87 @@ function renderWalls(ctx, state, game, w, h) {
     ctx.textAlign = 'center';
     ctx.fillText(`⚡ 2x WALL MULT ${remaining}s`, w / 2, 22);
   }
-}
 
-function renderBumpers(ctx, game, w, h) {
-  const bumpers = game._getBumpers();
-  if (bumpers.length === 0) return;
-  const now = performance.now();
-
-  for (const b of bumpers) {
-    const bx = b.fx * w, by = b.fy * h;
-    const pulse = 0.5 + 0.5 * Math.sin(now / 400 + b.fx * 10);
-    const r = b.radius;
-
+  if (lm > 0) {
+    const lAlpha = Math.min(0.9, 0.2 + lm * 0.12);
+    const wallColor = wallActive ? '255, 220, 60' : '80, 160, 255';
+    const lg = ctx.createLinearGradient(0, 0, 16, 0);
+    lg.addColorStop(0, `rgba(${wallColor}, ${lAlpha})`);
+    lg.addColorStop(1, `rgba(${wallColor}, 0)`);
+    ctx.fillStyle = lg;
+    ctx.fillRect(0, 0, 16, h);
+    ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, lAlpha + 0.3)})`;
+    ctx.fillRect(0, 0, 3, h);
     ctx.save();
-
-    // Outer glow
-    const glowR = r + 6 + pulse * 5;
-    const grd = ctx.createRadialGradient(bx, by, r * 0.3, bx, by, glowR);
-    grd.addColorStop(0, `rgba(255, 140, 60, ${0.35 + pulse * 0.2})`);
-    grd.addColorStop(1, 'rgba(255, 140, 60, 0)');
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.arc(bx, by, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body
-    const bg = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.3, r * 0.05, bx, by, r);
-    bg.addColorStop(0, '#ffe0a0');
-    bg.addColorStop(0.4, '#ff9040');
-    bg.addColorStop(1, '#cc4000');
-    ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.arc(bx, by, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pulsing outline
-    ctx.strokeStyle = `rgba(255, 220, 100, ${0.6 + pulse * 0.4})`;
-    ctx.lineWidth = 1.5 + pulse * 1.5;
-    ctx.beginPath();
-    ctx.arc(bx, by, r + 2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Label
-    ctx.fillStyle = '#1a0a00';
-    ctx.font = 'bold 9px monospace';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`x${b.payoutMult.toFixed(1)}`, bx, by);
-
+    ctx.translate(10, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(`x${lm.toFixed(1)}`, 0, 0);
     ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(60, 30, 30, 0.6)';
+    ctx.fillRect(0, 0, 3, h);
   }
-}
 
-function renderTrails(ctx, balls) {
-  for (const ball of balls) {
-    if (!ball._trail || ball._trail.length === 0) continue;
-    const info = getTierInfo(ball.tier);
-    const len = ball._trail.length;
-    for (let i = 0; i < len; i++) {
-      const pt = ball._trail[i];
-      ctx.globalAlpha = (i + 1) / (len + 1) * 0.5;
-      ctx.fillStyle = info.color;
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, Math.max(1.5, ball.radius * 0.3 * ((i + 1) / len)), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+  if (rm > 0) {
+    const rAlpha = Math.min(0.9, 0.2 + rm * 0.12);
+    const wallColor = wallActive ? '255, 220, 60' : '80, 160, 255';
+    const rg = ctx.createLinearGradient(w, 0, w - 16, 0);
+    rg.addColorStop(0, `rgba(${wallColor}, ${rAlpha})`);
+    rg.addColorStop(1, `rgba(${wallColor}, 0)`);
+    ctx.fillStyle = rg;
+    ctx.fillRect(w - 16, 0, 16, h);
+    ctx.fillStyle = `rgba(${wallColor}, ${Math.min(1, rAlpha + 0.3)})`;
+    ctx.fillRect(w - 3, 0, 3, h);
+    ctx.save();
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(120, 190, 255, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.translate(w - 10, h / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillText(`x${rm.toFixed(1)}`, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(60, 30, 30, 0.6)';
+    ctx.fillRect(w - 3, 0, 3, h);
+  }
+
+  if (tm > 0) {
+    const tAlpha = Math.min(0.9, 0.15 + tm * 0.1);
+    const tg = ctx.createLinearGradient(0, 0, 0, 14);
+    tg.addColorStop(0, `rgba(80, 200, 150, ${tAlpha})`);
+    tg.addColorStop(1, 'rgba(80, 200, 150, 0)');
+    ctx.fillStyle = tg;
+    ctx.fillRect(0, 0, w, 14);
+    ctx.fillStyle = `rgba(80, 200, 150, ${Math.min(1, tAlpha + 0.3)})`;
+    ctx.fillRect(0, 0, w, 2);
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(100, 220, 170, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`x${tm.toFixed(1)}`, w / 2, 14);
+  } else {
+    ctx.fillStyle = 'rgba(60, 60, 100, 0.5)';
+    ctx.fillRect(0, 0, w, 2);
+  }
+
+  if (bm > 0) {
+    const bAlpha = Math.min(0.9, 0.15 + bm * 0.1);
+    const bg = ctx.createLinearGradient(0, h, 0, h - 14);
+    bg.addColorStop(0, `rgba(80, 200, 150, ${bAlpha})`);
+    bg.addColorStop(1, 'rgba(80, 200, 150, 0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, h - 14, w, 14);
+    ctx.fillStyle = `rgba(80, 200, 150, ${Math.min(1, bAlpha + 0.3)})`;
+    ctx.fillRect(0, h - 2, w, 2);
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = 'rgba(100, 220, 170, 0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`x${bm.toFixed(1)}`, w / 2, h - 4);
+  } else {
+    ctx.fillStyle = 'rgba(60, 60, 100, 0.5)';
+    ctx.fillRect(0, h - 2, w, 2);
   }
 }
 

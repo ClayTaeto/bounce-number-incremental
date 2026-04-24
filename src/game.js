@@ -101,6 +101,7 @@ class Game {
       _wallHitHistory: [],
       wallMultiplierActive: false,
       wallMultiplierEnd: 0,
+      arenaLayout: 'classic',
     };
   }
 
@@ -108,12 +109,36 @@ class Game {
     const container = document.getElementById('arena-container');
     const oldW = this.canvas.width || container.clientWidth;
     const oldH = this.canvas.height || container.clientHeight;
-    this.canvas.width  = container.clientWidth;
-    this.canvas.height = container.clientHeight;
+
+    const layout = ARENA_LAYOUTS[(this.state && this.state.arenaLayout) || 'classic'] || ARENA_LAYOUTS.classic;
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    const targetRatio = layout.aspectRatio; // width / height
+
+    let newW, newH;
+    if (containerW / containerH > targetRatio) {
+      // Container is wider than target ratio — constrain by height
+      newH = containerH;
+      newW = Math.round(newH * targetRatio);
+    } else {
+      // Container is taller — constrain by width
+      newW = containerW;
+      newH = Math.round(newW / targetRatio);
+    }
+
+    this.canvas.width  = newW;
+    this.canvas.height = newH;
+    this.canvas.style.width  = newW + 'px';
+    this.canvas.style.height = newH + 'px';
+    // Center the canvas in the container
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.left = Math.round((containerW - newW) / 2) + 'px';
+    this.canvas.style.top  = Math.round((containerH - newH) / 2) + 'px';
+
     // Scale existing ball positions and velocities to the new arena size
     if (this.state && this.state.balls.length > 0 && oldW > 0) {
-      const sx = this.canvas.width  / oldW;
-      const sy = this.canvas.height / oldH;
+      const sx = newW / oldW;
+      const sy = newH / oldH;
       for (const b of this.state.balls) {
         b.x  *= sx;  b.y  *= sy;
         b.vx *= sx;  b.vy *= sy;
@@ -132,7 +157,8 @@ class Game {
   }
 
   getBaseSpeed() {
-    return (BASE_SPEED + (this.state.upgrades.speedUp || 0) * 20) * this._speedScale();
+    const layout = ARENA_LAYOUTS[this.state.arenaLayout] || ARENA_LAYOUTS.classic;
+    return (BASE_SPEED + (this.state.upgrades.speedUp || 0) * 20) * this._speedScale() * layout.speedMult;
   }
 
   getBallTargetSpeed(ball) {
@@ -168,15 +194,42 @@ class Game {
   }
 
   getWallMult(wall) {
-    let base = this.getBaseWallMult(wall);
+    const layout = ARENA_LAYOUTS[this.state.arenaLayout] || ARENA_LAYOUTS.classic;
+    const layoutMult = layout.wallMults && layout.wallMults[wall] !== undefined ? layout.wallMults[wall] : 1;
+    if (layoutMult === 0) return 0;
+    let upgradeMult = 1;
+    if (wall === 'left')  upgradeMult = 1 + (this.state.upgrades.leftWall  || 0) * 0.5;
+    else if (wall === 'right') upgradeMult = 1 + (this.state.upgrades.rightWall || 0) * 0.5;
+    let mult = upgradeMult * layoutMult;
     if (this.state.wallMultiplierActive) {
       if (Date.now() < this.state.wallMultiplierEnd) {
-        base *= 2;
+        mult *= 2;
       } else {
         this.state.wallMultiplierActive = false;
       }
     }
-    return base;
+    return mult;
+  }
+
+  setLayout(layoutId) {
+    if (!ARENA_LAYOUTS[layoutId]) return;
+    this.state.arenaLayout = layoutId;
+    this._resizeCanvas();
+    this._updateLayoutButtons();
+    saveGame(this.state, this.canvas.width, this.canvas.height);
+  }
+
+  _updateLayoutButtons() {
+    const layoutId = this.state.arenaLayout || 'classic';
+    const perm = this.state.permanentUpgrades;
+    document.querySelectorAll('.layout-btn').forEach(btn => {
+      const id = btn.dataset.layout;
+      const locked = (id === 'pinball' && !perm.unlockPinball) ||
+                     (id === 'hallway' && !perm.unlockHallway);
+      btn.classList.toggle('active', id === layoutId);
+      btn.classList.toggle('locked', locked);
+      btn.disabled = locked;
+    });
   }
 
   _getBumpers() {
@@ -184,11 +237,10 @@ class Game {
     if (level === 0) return [];
     const bumperRadius = 14;
     const payoutMult = 0.5 + level * 0.5;
-    // Positions: [fracX, fracY] pairs, added progressively with level
     const positions = [
-      [0.25, 0.4], [0.75, 0.6],   // level 1-2: 2 bumpers
-      [0.5,  0.4],                  // level 3:   3rd bumper
-      [0.25, 0.65],                 // level 4:   4th bumper
+      [0.25, 0.4], [0.75, 0.6],
+      [0.5,  0.4],
+      [0.25, 0.65],
     ];
     const counts = [0, 2, 2, 3, 4, 4];
     const count = counts[level];
@@ -702,11 +754,13 @@ class Game {
     const keepPerm = { ...this.state.permanentUpgrades };
     const keepPrestige = this.state.prestige + 1;
     const keepShards = this.state.primeShards;
+    const keepLayout = this.state.arenaLayout || 'classic';
     this.state = this._freshState();
     this.state.lightFragments = keepLF;
     this.state.permanentUpgrades = keepPerm;
     this.state.prestige = keepPrestige;
     this.state.primeShards = keepShards;
+    this.state.arenaLayout = keepLayout;
     this._challengesMergedThisRun = false;
     this._slowBallTimer = 0;
     this._fullHouseTimer = 0;
@@ -774,6 +828,7 @@ class Game {
       this._lastCardRebuild = now;
       this._renderUpgradeCards();
       this._achievementSystem.check(this.state);
+      this._updateLayoutButtons();
     }
   }
 
@@ -956,6 +1011,17 @@ class Game {
     if (settingShake) {
       settingShake.addEventListener('change', () => { this.state._shakeEnabled = settingShake.checked; });
     }
+
+    document.querySelectorAll('.layout-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const layoutId = btn.dataset.layout;
+        const perm = this.state.permanentUpgrades;
+        if (layoutId === 'pinball' && !perm.unlockPinball) return;
+        if (layoutId === 'hallway' && !perm.unlockHallway) return;
+        this.setLayout(layoutId);
+      });
+    });
+    this._updateLayoutButtons();
   }
 
   _loop(timestamp) {

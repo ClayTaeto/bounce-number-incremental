@@ -22,6 +22,7 @@ function saveGame(state, arenaW, arenaH) {
       highestTier: state.highestTier,
       wallHits: state.wallHits,
       prestigeAvailable: state.prestigeAvailable,
+      arenaLayout: state.arenaLayout || 'classic',
       savedArenaW: arenaW || REFERENCE_WIDTH,
       savedArenaH: arenaH || REFERENCE_WIDTH * 0.6,
       // Store positions normalized to 0-1 so they scale cleanly on load
@@ -64,6 +65,7 @@ function loadSave(state, arenaW, arenaH) {
     state.highestTier = data.highestTier || 0;
     state.wallHits = data.wallHits || 0;
     state.prestigeAvailable = data.prestigeAvailable || false;
+    state.arenaLayout = data.arenaLayout || 'classic';
 
     // Calculate offline earnings
     const now = Date.now();

@@ -104,6 +104,24 @@ const UPGRADES = [
     unlockCondition: s => s.highestTier >= 7,
   },
 
+  // ── Arena layout unlocks — require prestige ─────────────────────────────────
+  {
+    id: 'unlockPinball', tab: 'Arena',
+    name: 'Pinball Table', desc: 'Unlock the tall narrow Pinball arena layout',
+    maxLevel: 1, baseCost: 500, costMult: 1,
+    persistent: true, currency: 'primeShards',
+    effect: l => l > 0 ? 'Unlocked' : 'Unlock Pinball layout',
+    unlockCondition: s => s.prestige >= 1,
+  },
+  {
+    id: 'unlockHallway', tab: 'Arena',
+    name: 'Long Hallway', desc: 'Unlock the wide horizontal Hallway arena layout',
+    maxLevel: 1, baseCost: 500, costMult: 1,
+    persistent: true, currency: 'primeShards',
+    effect: l => l > 0 ? 'Unlocked' : 'Unlock Hallway layout',
+    unlockCondition: s => s.prestige >= 2,
+  },
+
   // ── Add tab extras ───────────────────────────────────────────────────────────
   {
     id: 'holdBoost', tab: 'Add',

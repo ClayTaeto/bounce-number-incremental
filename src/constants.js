@@ -79,3 +79,27 @@ function getRampRate(ramp, holdMs, bonus) {
   }
   return ramp[ramp.length - 1].rate + (bonus || 0);
 }
+
+const ARENA_LAYOUTS = {
+  classic: {
+    id: 'classic', name: 'Classic Box',
+    aspectRatio: 4 / 3,
+    wallMults: { left: 1, right: 1, top: 1, bottom: 1 },
+    speedMult: 1,
+    description: 'Standard arena. Balanced.',
+  },
+  pinball: {
+    id: 'pinball', name: 'Pinball Table',
+    aspectRatio: 2 / 3,
+    wallMults: { left: 0.3, right: 0.3, top: 2, bottom: 2 },
+    speedMult: 1.1,
+    description: 'Tall narrow arena. Top/bottom walls are strong.',
+  },
+  hallway: {
+    id: 'hallway', name: 'Long Hallway',
+    aspectRatio: 8 / 3,
+    wallMults: { left: 3, right: 3, top: 0.5, bottom: 0.5 },
+    speedMult: 1.2,
+    description: 'Wide flat arena. Side walls pay out big.',
+  },
+};
