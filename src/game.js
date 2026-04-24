@@ -99,6 +99,8 @@ class Game {
       _mergeComboCount: 0,
       _mergeComboWindow: 0,
       _wallHitHistory: [],
+      wallMultiplierActive: false,
+      wallMultiplierEnd: 0,
     };
   }
 
@@ -159,10 +161,40 @@ class Game {
     return (LIGHTSPEED_BASE + (this.state.permanentUpgrades.lsBuffer || 0) * 50) * this._speedScale();
   }
 
+  // Base wall mult from upgrades only (no global boost) — used for visual glow
+  getBaseWallMult(wall) {
+    const key = { left: 'leftWall', right: 'rightWall', top: 'topWall', bottom: 'bottomWall' }[wall];
+    return key ? 1 + (this.state.upgrades[key] || 0) * 0.5 : 1;
+  }
+
   getWallMult(wall) {
-    if (wall === 'left')  return 1 + (this.state.upgrades.leftWall  || 0) * 0.5;
-    if (wall === 'right') return 1 + (this.state.upgrades.rightWall || 0) * 0.5;
-    return 0;
+    let base = this.getBaseWallMult(wall);
+    if (this.state.wallMultiplierActive) {
+      if (Date.now() < this.state.wallMultiplierEnd) {
+        base *= 2;
+      } else {
+        this.state.wallMultiplierActive = false;
+      }
+    }
+    return base;
+  }
+
+  _getBumpers() {
+    const level = this.state.upgrades.bumperUpgrade || 0;
+    if (level === 0) return [];
+    const bumperRadius = 14;
+    const payoutMult = 0.5 + level * 0.5;
+    // Positions: [fracX, fracY] pairs, added progressively with level
+    const positions = [
+      [0.25, 0.4], [0.75, 0.6],   // level 1-2: 2 bumpers
+      [0.5,  0.4],                  // level 3:   3rd bumper
+      [0.25, 0.65],                 // level 4:   4th bumper
+    ];
+    const counts = [0, 2, 2, 3, 4, 4];
+    const count = counts[level];
+    return positions.slice(0, count).map(([fx, fy]) => ({
+      fx, fy, radius: bumperRadius, payoutMult,
+    }));
   }
 
   _getAddCost() {
@@ -435,6 +467,11 @@ class Game {
   }
 
   _onWallHit(ball, wall, speed) {
+    if ((wall === 'left' || wall === 'right') && ball.tier >= 10) {
+      this.state.wallMultiplierActive = true;
+      this.state.wallMultiplierEnd = Date.now() + 5000;
+    }
+
     let wallMult = this.getWallMult(wall);
     if (wallMult === 0) {
       const wallSynergyLevel = this.state.upgrades.wallSynergy || 0;
@@ -582,6 +619,60 @@ class Game {
     this.state._popups = this.state._popups.filter(p => p.life > 0);
     for (const p of this.state._popups) {
       p.y += p.vy * dt; p.life -= dt;
+    }
+  }
+
+  _updateBumpers() {
+    const bumpers = this._getBumpers();
+    if (bumpers.length === 0) return;
+    const w = this.canvas.width, h = this.canvas.height;
+    const now = performance.now();
+
+    for (const ball of this.state.balls) {
+      if (ball._remove) continue;
+      for (const b of bumpers) {
+        const bx = b.fx * w, by = b.fy * h;
+        const dx = ball.x - bx, dy = ball.y - by;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const minDist = ball.radius + b.radius;
+        if (dist < minDist && dist > 0) {
+          // Debounce per ball per bumper hit
+          const key = `_bumperHit_${b.fx}_${b.fy}`;
+          if (now - (ball[key] || 0) < 100) continue;
+          ball[key] = now;
+
+          // Reflect velocity off bumper normal
+          const nx = dx / dist, ny = dy / dist;
+          const dot = ball.vx * nx + ball.vy * ny;
+          ball.vx -= 2 * dot * nx;
+          ball.vy -= 2 * dot * ny;
+
+          // Push ball out of overlap
+          ball.x = bx + nx * (minDist + 1);
+          ball.y = by + ny * (minDist + 1);
+
+          // Bonus payout
+          const bonus = new Decimal(2).pow(ball.tier).mul(b.payoutMult);
+          this.state.money = this.state.money.add(bonus);
+          this.state.lifetimeMoney = this.state.lifetimeMoney.add(bonus);
+          this._lastIncomeWindow.push({ t: Date.now(), v: bonus });
+
+          // Visual feedback
+          ball.hitFlash = 0.15;
+          if (this.state._popups.length < 25) {
+            this.state._popups.push({
+              x: ball.x, y: ball.y - ball.radius,
+              text: '$' + formatMoney(bonus),
+              life: 1.0, vy: -50,
+            });
+          }
+          const pc = getTierInfo(ball.tier).color;
+          for (let i = 0; i < 5; i++) {
+            const pa = (i / 5) * Math.PI * 2;
+            this.state._particles.push({ x: bx, y: by, vx: Math.cos(pa) * 70, vy: Math.sin(pa) * 70, life: 0.4, size: 2.5, color: pc });
+          }
+        }
+      }
     }
   }
 
@@ -874,6 +965,7 @@ class Game {
 
     this._updatePhysics(dt);
     this._updateChallenges(dt);
+    this._updateBumpers();
     this._updateInput(now);
     this._updateParticles(dt);
     this._updatePopups(dt);

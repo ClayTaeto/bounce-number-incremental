@@ -22,6 +22,20 @@ const UPGRADES = [
     effect: l => `x${(1 + l * 0.5).toFixed(1)} mult`,
     unlockCondition: () => true,
   },
+  {
+    id: 'topWall', tab: 'Walls',
+    name: 'Top Wall Power', desc: 'Top wall income multiplier',
+    maxLevel: 10, baseCost: 30, costMult: 2,
+    effect: l => `x${(1 + l * 0.5).toFixed(1)} mult`,
+    unlockCondition: () => true,
+  },
+  {
+    id: 'bottomWall', tab: 'Walls',
+    name: 'Bottom Wall Power', desc: 'Bottom wall income multiplier',
+    maxLevel: 10, baseCost: 30, costMult: 2,
+    effect: l => `x${(1 + l * 0.5).toFixed(1)} mult`,
+    unlockCondition: () => true,
+  },
 
   // ── Unlock after first merge (first 2) ──────────────────────────────────────
   {
@@ -61,6 +75,16 @@ const UPGRADES = [
     name: 'Critical Hit', desc: '10× payout chance on wall hit',
     maxLevel: 5, baseCost: 350, costMult: 3,
     effect: l => l > 0 ? `${l * 5}% crit chance` : 'Random big payouts',
+    unlockCondition: s => s.highestTier >= 5,
+  },
+  {
+    id: 'bumperUpgrade', tab: 'Walls',
+    name: 'Bumpers', desc: 'Add circular bumpers that pay bonus money on hit',
+    maxLevel: 5, baseCost: 400, costMult: 3,
+    effect: l => {
+      const counts = [0, 2, 2, 3, 4, 4];
+      return l > 0 ? `${counts[l]} bumpers, x${(0.5 + l * 0.5).toFixed(1)} payout` : 'Place bumpers in arena';
+    },
     unlockCondition: s => s.highestTier >= 5,
   },
 
